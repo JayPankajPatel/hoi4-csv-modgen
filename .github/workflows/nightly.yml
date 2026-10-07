@@ -1,5 +1,6 @@
-# Rebuilds the Kaiserredux example (from the example/kaiser_redux branch) with the current
-# generator and checks it still matches the original mod, on Linux and Windows.
+# Runs the test suite, and rebuilds the Kaiserredux example (from the
+# example/kaiser_redux branch) with the current generator and checks it still
+# matches the original mod, on Linux and Windows.
 name: Nightly
 
 on:
@@ -11,6 +12,21 @@ on:
   pull_request:
 
 jobs:
+  tests:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Run the test suite
+        run: uv run python -m unittest discover -s tests -v
+
   kaiser-example:
     name: Kaiserredux example (${{ matrix.os }})
     strategy:

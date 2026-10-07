@@ -1,0 +1,7 @@
+exit code: 1
+
+ERROR: events.csv line 2: picture file 'pictures/missing.png' not found (paths are relative to <project>)
+ERROR: events.csv line 3: picture '../outside.png' is outside the project folder; put images inside it (the sprite name and the copy are built from the path relative to it)
+ERROR: events.csv line 4: picture 'pictures/a.jpg' must be a .png or .dds file
+
+3 error(s) found. Nothing was generated. Fix the CSVs and run again.

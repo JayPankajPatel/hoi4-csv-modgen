@@ -29,3 +29,5 @@ max-doc-length = 79
 [tool.ty.rules]
 # every ty diagnostic is an error, so the pre-commit hook fails on any of them
 all = "error"
+# Requires @typing.override, which needs Python 3.12; this project supports 3.9.
+missing-override-decorator = "ignore"

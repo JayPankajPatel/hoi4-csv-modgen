@@ -1,0 +1,4 @@
+exit code: 0
+WARNING: events.csv line 3: picture 'pictures/small.dds' is 16x16; country_event pictures are usually 210x176
+
+OK: 3 events, 4 options written to <project>/output/my_mod

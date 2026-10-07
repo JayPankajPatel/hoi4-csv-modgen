@@ -1,0 +1,3 @@
+exit code: 0
+
+OK: 3 events, 4 options written to <project>/output/my_mod
