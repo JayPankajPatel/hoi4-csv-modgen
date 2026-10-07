@@ -1,0 +1,40 @@
+# Rebuilds the Kaiserredux example (from the example/kaiser_redux branch) with the current
+# generator and checks it still matches the original mod, on Linux and Windows.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC every day
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  kaiser-example:
+    name: Kaiserredux example (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Get the example from example/kaiser_redux
+        run: |
+          git fetch --depth=1 origin example/kaiser_redux
+          git checkout FETCH_HEAD -- examples/kaiser_redux
+
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Generate
+        run: uv run modgen.py examples/kaiser_redux
+
+      - name: Compare with the original Kaiserredux files
+        run: uv run examples/kaiser_redux/verify.py
