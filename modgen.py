@@ -28,6 +28,9 @@ KEY_RE = re.compile(r"^(?!\d+$)[a-z0-9_]+$")
 RESERVED_KEYS = {"t", "d"}
 MOD_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 ON_ACTION_RE = re.compile(r"^on_[a-z0-9_]+$")
+# which kind of scope each event type runs in; firing across kinds needs a `scope`
+SCOPE_CLASS = {"country_event": "country", "news_event": "country", "state_event": "state", "unit_leader_event": "unit leader"}
+SCOPE_RE = re.compile(r"^[A-Za-z0-9_.:@]+$")
 GENERATED = "# GENERATED FILE - do not edit. Change the CSVs and re-run the generator."
 
 
@@ -68,6 +71,37 @@ def parse_bool(value):
     raise ValueError(value)
 
 
+def brace_counts(line):
+    """Count { and } outside quoted strings and # comments."""
+    opens = closes = 0
+    in_str = False
+    for ch in line:
+        if ch == '"':
+            in_str = not in_str
+        elif in_str:
+            continue
+        elif ch == "#":
+            break
+        elif ch == "{":
+            opens += 1
+        elif ch == "}":
+            closes += 1
+    return opens, closes
+
+
+def brace_problem(text):
+    """Return a description of unbalanced braces in a raw script cell, or None."""
+    depth = 0
+    for line in text.split("\n"):
+        opens, closes = brace_counts(line)
+        depth += opens - closes
+        if depth < 0:
+            return "has a } with no matching {"
+    if depth > 0:
+        return f"is missing {depth} closing }}"
+    return None
+
+
 def fmt_block(text, indent):
     """Re-indent a raw script snippet using brace depth."""
     out, depth = [], 0
@@ -75,8 +109,7 @@ def fmt_block(text, indent):
         line = line.strip()
         if not line:
             continue
-        opens = line.count("{")
-        closes = line.count("}")
+        opens, closes = brace_counts(line)
         lead_close = len(line) - len(line.lstrip("}"))
         d = max(depth - lead_close, 0)
         out.append("\t" * (indent + d) + line)
@@ -100,10 +133,19 @@ def load():
 def validate(events, options, branches):
     errors, warnings = [], []
     ev = {}
+    bad_ids, bad_keys = set(), set()  # already reported; references to them are skipped quietly
+
+    def check_script(loc, row, cols):
+        for col in cols:
+            problem = row.get(col) and brace_problem(row[col])
+            if problem:
+                errors.append(f"{loc}: {col} {problem}")
+
     for e in events:
         loc = f"events.csv line {e['_line']}"
         if not ID_RE.match(e["id"]):
             errors.append(f"{loc}: id '{e['id']}' must look like namespace.number (e.g. mymod.1)")
+            bad_ids.add(e["id"])
             continue
         if e["id"] in ev:
             errors.append(f"{loc}: duplicate event id '{e['id']}' (first used on line {ev[e['id']]['_line']})")
@@ -156,11 +198,14 @@ def validate(events, options, branches):
             warnings.append(f"{loc}: event '{e['id']}' is not triggered-only but has no mtth_days")
         e["_triggered_only"] = triggered
         e["_fired_by"] = fired_by
+        check_script(loc, e, ("trigger", "immediate", "extra"))
         ev[e["id"]] = e
 
     opts = defaultdict(list)
     for o in options:
         loc = f"options.csv line {o['_line']}"
+        if o["event_id"] in bad_ids:
+            continue
         if o["event_id"] not in ev:
             errors.append(f"{loc}: event_id '{o['event_id']}' does not exist in events.csv")
             continue
@@ -170,6 +215,7 @@ def validate(events, options, branches):
                 f"{loc}: key '{key}' must be lowercase letters, digits and _, not only digits, "
                 f"and not 't' or 'd' (e.g. mobilize)"
             )
+            bad_keys.add((o["event_id"], key))
             continue
         if any(other["key"] == key for other in opts[o["event_id"]]):
             errors.append(f"{loc}: event '{o['event_id']}' already has an option with key '{key}'")
@@ -178,7 +224,9 @@ def validate(events, options, branches):
             errors.append(f"{loc}: option '{key}' of '{o['event_id']}' has no name")
         if o.get("order") and not re.fullmatch(r"-?\d+", o["order"]):
             errors.append(f"{loc}: order '{o['order']}' must be a whole number")
-            continue
+        check_script(loc, o, ("effects", "trigger", "extra"))
+        if o.get("ai_chance") and not re.fullmatch(r"-?\d+(\.\d+)?", o["ai_chance"]):
+            check_script(loc, o, ("ai_chance",))
         opts[o["event_id"]].append(o)
 
     for eid, olist in opts.items():
@@ -189,13 +237,17 @@ def validate(events, options, branches):
             olist.sort(key=lambda o: int(o["order"]))  # stable: ties keep row order
 
     for eid, e in ev.items():
-        if not opts[eid]:
+        if not opts[eid] and not e["_hidden"]:
             errors.append(f"events.csv line {e['_line']}: event '{eid}' has no options in options.csv")
+        if e["_hidden"] and len(opts[eid]) > 1:
+            warnings.append(f"events.csv line {e['_line']}: hidden event '{eid}' has {len(opts[eid])} options; nobody sees the choice")
 
     incoming = set()
     for b in branches:
         loc = f"branches.csv line {b['_line']}"
         src, to = b["from_event"], b["to_event"]
+        if src in bad_ids or to in bad_ids or (src, b["from_option"]) in bad_keys:
+            continue
         if src not in ev:
             errors.append(f"{loc}: from_event '{src}' does not exist")
             continue
@@ -213,6 +265,16 @@ def validate(events, options, branches):
         for col in ("days", "hours", "random_days"):
             if b.get(col) and not re.fullmatch(r"\d+", b[col]):
                 errors.append(f"{loc}: {col} '{b[col]}' must be a whole number")
+        scope = b.get("scope", "")
+        src_class, to_class = SCOPE_CLASS.get(ev[src]["_type"]), SCOPE_CLASS.get(ev[to]["_type"])
+        if scope and not SCOPE_RE.match(scope):
+            errors.append(f"{loc}: scope '{scope}' must be a single scope, e.g. capital_scope, GER, 64")
+        elif not scope and src_class and to_class and src_class != to_class:
+            errors.append(
+                f"{loc}: '{to}' is a {ev[to]['_type']} but '{src}' is a {ev[src]['_type']}; "
+                f"set scope to say which {to_class} gets it (e.g. capital_scope)"
+            )
+        check_script(loc, b, ("condition",))
         incoming.add(to)
 
     for eid, e in ev.items():
@@ -289,15 +351,18 @@ def gen_events(ev, opts, branches):
                 for col in ("days", "hours", "random_days"):
                     if b.get(col):
                         parts.append(f"{col} = {b[col]}")
+                call = f"{target_type} = {{ {' '.join(parts)} }}"
+                if b.get("scope"):
+                    call = f"{b['scope']} = {{ {call} }}"
                 if b.get("condition"):
                     lines.append("\t\tif = {")
                     lines.append("\t\t\tlimit = {")
                     lines += fmt_block(b["condition"], 4)
                     lines.append("\t\t\t}")
-                    lines.append(f"\t\t\t{target_type} = {{ {' '.join(parts)} }}")
+                    lines.append(f"\t\t\t{call}")
                     lines.append("\t\t}")
                 else:
-                    lines.append(f"\t\t{target_type} = {{ {' '.join(parts)} }}")
+                    lines.append(f"\t\t{call}")
             if o.get("extra"):
                 lines += fmt_block(o["extra"], 2)
             lines.append("\t}")

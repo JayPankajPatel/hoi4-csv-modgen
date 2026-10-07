@@ -55,7 +55,7 @@ mod_path = C:/Users/you/Documents/Paradox Interactive/Hearts of Iron IV/mod/my_m
 | `fired_by` | no | How the event starts; see below. |
 | `triggered_only` | no | `yes` (default) / `no`. Usually leave blank and let `fired_by` decide. |
 | `fire_only_once` | no | `yes` / `no` |
-| `hidden` | no | `yes` / `no` |
+| `hidden` | no | `yes` / `no`. Hidden events may have no options (just `immediate`). |
 | `mtth_days` | no | Mean time to happen in days. Requires `fired_by = mtth`. |
 | `trigger` | no | Raw script: conditions, no outer `{ }` |
 | `immediate` | no | Raw script: effects that run when the event fires |
@@ -106,8 +106,11 @@ belongs to which option.
 | `to_event` | yes | Event to fire |
 | `days` / `hours` / `random_days` | no | Delay, whole numbers |
 | `condition` | no | Raw script trigger; branch only fires if true |
+| `scope` | no | Who receives the event, e.g. `capital_scope`, `GER`, a state id. Required when the types differ (country/news event → state event or unit leader event). |
 
 An option can have several branches (several rows).
+
+With `scope`, the call is wrapped: `capital_scope = { state_event = { id = mymod.5 } }`.
 
 ## Writing raw script cells
 
@@ -122,7 +125,8 @@ if = {
 }
 ```
 
-The generator handles indentation.
+The generator handles indentation and reports cells with unbalanced braces. Braces inside
+`# comments` and `"quoted strings"` are ignored.
 
 ## Localisation keys
 
