@@ -1,0 +1,3 @@
+from_event,from_option,to_event,days,hours,random_days,condition,scope,hidden
+ghana.1,c,ghana.2,24,,,,,yes
+transylvania.1,a,transylvania.2,,,,,ROM,

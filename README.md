@@ -174,3 +174,8 @@ uv run pre-commit run --all-files
 ```
 
 The hooks run `ruff check --fix`, `ruff format` and `ty check`.
+
+## Example
+
+[`examples/kaiser_redux/`](examples/kaiser_redux/) rebuilds 18 Kaiserredux events from CSV and checks the
+output against the originals.

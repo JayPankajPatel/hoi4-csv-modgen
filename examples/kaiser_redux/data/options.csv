@@ -1,0 +1,178 @@
+event_id,key,order,name,effects,ai_chance,trigger,extra
+kachin.1,a,,Go with Sabaw Tu.,"army_experience = 50
+complete_national_focus = KAC_Sabaw_Tus_Plan",,,
+kachin.1,b,,Support Agu Di.,"add_stability = 0.02
+army_experience = 30
+complete_national_focus = KAC_Agu_Dis_Plan",,,
+kachin.2,a,,Humiliating!,"add_political_power = -75
+add_stability = -0.1
+add_war_support = -0.05",,,
+citycapturesmall.1,a,,How can one lose so much and gain so little?,,,"NOT = {
+	tag = FRA
+}",
+citycapturesmall.1,b,,Ils ne passeront pas! Not another inch!,,,tag = FRA,
+sierra.1,a,,Maragai’s united front stands firm!,,factor = 60,,
+sierra.1,b,,The UNF center yields to the conservatives of Wurie.,"create_country_leader = {
+	name = ""Amadu Wurie""
+	picture = ""gfx/leaders/SIE/Portrait_Sierra_Leone_Amadu_Wurie.png""
+	expire = ""1.1.1""
+	ideology = soccon_progressive_democracy_subtype
+}
+set_party_name = {
+	ideology = social_conservative
+	name = SIE_pepu_party
+	long_name = SIE_pepu_party_long
+}",factor = 20,,
+sierra.1,c,,The UNF center yields to Sankoh’s liberals.,"create_country_leader = {
+	name = ""Lamina Sankoh""
+	picture = ""gfx/leaders/SIE/Portrait_Sierra_Leone_Lamina_Sankoh.png""
+	expire = ""1.1.1""
+	ideology = christian_democracy_subtype
+}
+set_party_name = {
+	ideology = social_conservative
+	name = SIE_market_liberal_party
+	long_name = SIE_market_liberal_party_long
+}",factor = 20,,
+ghana.1,a,,The CPP adopts a system inspired by the Syndicalists.,"set_politics = {
+	ruling_party = syndicalist
+	elections_allowed = no
+}
+add_popularity = {
+	ideology = syndicalist
+	popularity = 0.2
+}
+AFR_open_political_tree = yes
+AFR_open_economy_tree = yes",factor = 15,,
+ghana.1,b,,The current party line stays.,"AFR_open_political_tree = yes
+AFR_open_economy_tree = yes",factor = 50,,
+ghana.1,c,,Nkrumah clamps down on opposition and declares a one-party state.,"set_politics = {
+	ruling_party = totalist
+	elections_allowed = no
+}
+add_popularity = {
+	ideology = totalist
+	popularity = 0.3
+}",factor = 35,,
+ghana.2,a,,The Autocratic Royalists re-establish the Ashanti Kingdom!,"set_politics = {
+	ruling_party = paternal_autocrat
+	elections_allowed = no
+}
+add_popularity = {
+	ideology = paternal_autocrat
+	popularity = 0.2
+}
+AFR_open_political_tree = yes
+AFR_open_economy_tree = yes",factor = 75,,
+ghana.2,b,,Nkrumah fends off all enemies of the revolution!,"AFR_open_political_tree = yes
+AFR_open_economy_tree = yes",factor = 25,,
+flavornews.1,a,,Congratulations to the winners!,,,,
+flavornews.2,a,,Congratulations to 'Danubia!',,,,
+flavornews.3,a,,TODO,,,,
+flavornews.4,a,,TODO,,,,
+flavornews.5,a,,TODO,,,,
+transylvania.1,a,,Proclaim the Union with Romania.,,factor = 100,,
+transylvania.1,b,,"No, we should keep our independence!",add_political_power = -100,factor = 0,,
+transylvania.2,a,,"Welcome, Romanian brethren!","annex_country = {
+	target = TRS
+	transfer_troops = yes
+}",,,
+kur.1,a,,Allahu Akbar!,"set_country_flag = KUR_revolt
+# worldnews.427 lives in another file, so it can't be a branch
+hidden_effect = {
+	news_event = {
+		id = worldnews.427
+		days = 1
+	}
+}",factor = 100,,
+kur.2,a,,Damn Barzinji!,"KUR = {
+	transfer_state = 819
+	hidden_effect = {
+		set_politics = {
+			ruling_party = paternal_autocrat
+			last_election = ""1888.6.15""
+			election_frequency = 48
+			elections_allowed = no
+		}
+		set_popularities = {
+			totalist = 0
+			radical_socialist = 5
+			syndicalist = 0
+			social_democrat = 0
+			social_liberal = 0
+			market_liberal = 0
+			social_conservative = 22
+			authoritarian_democrat = 10
+			paternal_autocrat = 63
+			national_populist = 0
+		}
+		division_template = {
+			name = ""Dabeşkirina Mizgeftê""
+			division_names_group = OTT_INF_01
+			regiments = {
+				cavalry = { x = 0 y = 0 }
+				cavalry = { x = 0 y = 1 }
+				cavalry = { x = 0 y = 2 }
+				cavalry = { x = 1 y = 0 }
+			}
+		}
+	}
+	declare_war_on = {
+		target = TUR
+		type = annex_everything
+	}
+	hidden_effect = {
+		news_event = worldnews.429
+	}
+}
+819 = {
+	create_unit = {
+		division = ""name = \""Dabeşkirina Mizgeftê\"" division_template = \""Dabeşkirina Mizgeftê\""  start_experience_factor = 0.1""
+		owner = KUR
+	}
+	create_unit = {
+		division = ""name = \""Dabeşkirina Mizgeftê\"" division_template = \""Dabeşkirina Mizgeftê\""  start_experience_factor = 0.1""
+		owner = KUR
+	}
+}",factor = 100,,
+unit_leader.1,a,,Unfortunate.,"FROM = {
+	add_timed_unit_leader_trait = {
+		trait = sick
+		days = 30
+	}
+}",,,
+unit_leader.2,a,,Unfortunate.,"FROM = {
+	add_timed_unit_leader_trait = {
+		trait = wounded
+		days = 90
+	}
+}",,,
+unit_leader.10,a,,,"ROOT = {
+	if = {
+		limit = {
+			check_variable = {
+				random < 0.5
+				} # This makes it a 50/50
+		}
+		random_unit_leader = {
+			limit = {
+				has_unit_leader_flag = unit_leader_event
+			}
+			unit_leader_event = {
+				id = unit_leader.1
+			}
+			clr_unit_leader_flag = unit_leader_event
+		}
+		else = {
+			random_unit_leader = {
+				limit = {
+					has_unit_leader_flag = unit_leader_event
+				}
+				unit_leader_event = {
+					id = unit_leader.2
+				}
+				clr_unit_leader_flag = unit_leader_event
+			}
+		}
+	}
+}",,,

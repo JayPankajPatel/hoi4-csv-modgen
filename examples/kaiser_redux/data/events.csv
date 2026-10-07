@@ -1,0 +1,75 @@
+id,type,title,desc,picture,fired_by,fire_scope,triggered_only,fire_only_once,hidden,mtth_days,trigger,immediate,extra
+kachin.1,country_event,A Formal Army,"The need for a central doctrine to govern the new army is clear. There is disagreement, however, about what that doctrine should be.",,external,,yes,,,,,"log = ""[GetDateText]: [Root.GetName]: event kachin.1""",
+kachin.2,country_event,Failure in Kachin,"The political situation in Kachin has deteriorated and little military progress has been made. As such, our officers in the field seem to have agreed to a ceasefire with only the most limited of ascent. The fighting has stopped and with our economic interests in Kachin destroyed, there is little justification to restart the conflict.",,external,,yes,,,,,"log = ""[GetDateText]: [Root.GetName]: event kachin.2""",
+citycapturesmall.1,country_event,The Second Battle of Verdun,"It was inevitable that conflict between France and another nation would cause Verdun's fortifications to come under siege once more. The bunkers that constituted the defenses had been modernized plenty since the Weltkrieg, but so too had the gunnery that an invading force could wield to turn all such progress into smoldering rubble. Just as before, the fighting had started with an artillery duel between the two armies present, alongside a spectacular aerial skirmish. The gunnery of the attackers, alongside their tenacious will in assaulting the French bunker systems, had ultimately pushed Verdun's overseers towards the Meuse. Room to room fighting overtook the aged ""castles"" nearby, and a bitter reality set in: Despite the advances of armament, the infamous meat grinder of the First Weltkrieg would materialize once more.
+
+Despite this, the defenders had been either commanded to retake the initiative or, in the case of a few regiments, attempted to do so themselves against orders. The national pride associated with Verdun, and the psychological loss that would come with its possible capture, had forced anyone with a command authority or those who held the cause of France close to the heart to adopt a relentless, if also ""insane"", posture. To the shouts of ""Ils ne passeront pas!"", the French soldiers, if heroic, aggressively charged against the fortifying enemy positions on their former territory. A brutal fight over soiled earth and rubble resulted in the attackers needing to send more of their own men into the fray, especially as artillery from across the river began firing upon them. Casualties mounted further upon both sides, but in the end fortune would not smile on the French as it had before.
+
+This time, it was not only artillery that the French defenders in their innumerable counter-attacks were exposed to, but fire from advanced air power and automatic weaponry of the modern era. Artillery shells were aided by dive bombing and incendiary payloads from bombers that remnant, antiquated anti-air could not hope to reach, quickly turning the lands around Fort Douaumont and Fort Vaux into mass graveyards. As the bend of the Meuse itself nearby began to grow choked with the waste left from war, flesh and steel alike, the French forces had ultimately been forced to swallow the bitter cup.
+
+Verdun had been lost, and a [ROOT.GetAdjective] flag now flew above the battered symbol of what was once a symbol of French strength in the face of overwhelming odds.",GFX_report_event_FRA_Verdun_Capture,external,,,,,,,"log = ""[GetDateText]: [Root.GetName]: event citycapturesmall.1""
+set_global_flag = FRA_Verdun_Battle_Happened",
+sierra.1,country_event,A Crack Threatens to Grow Within the UNF,"Until now, the big tent that is the United National Front has been able to maintain stability and order by safeguarding the moderate centre of Sierra Leonean politics, but as the nation further stabilizes, many chafe under the alleged inaction of President Milton Margai. These forces within the UNF’s big tent - primarily the Protectorate Educative Progressive Union of Amadu Wurie on the right and Lamina Sankoh’s branch of the Sierra Leone People’s Party on the left - now jockey for control of the government from within the UNF, threatening to tear Margai’s united front apart in order to pursue their own agenda. Milton Margai, one of the key forefathers of the Sierra Leonean independence movement, is known for his moderate stances, his charm and friendly demeanor, and his political savvy, being well respected by most in the nation regardless of class or social standing, but he has also been accused of causing stagnation by some due to his hesitance to implement any kind of sweeping reforms, instead preferring compromise, bipartisanship, and gradualism, while others are wary of his power-hungry younger brother Albert Margai who has shown an interest in more authoritarian practices, though thankfully he has little real power in the UNF.
+
+Furthermore, on the Left of the UNF divide, there is Lamina Sankoh - born as Etheldred Nathaniel Jones - who is a creole and former Christian priest educated in America and Britain known for his more liberal, populist takes and pro-working class stances, overseeing programs like penny-savings banks for the poor as well as successfully organizing the total restructuring of Freetown’s municipal government to make it more efficient, though his detractors see him and his People’s Party as dangerous rabble rousers and foreign-influenced radicals despite Sankoh’s own anti-Western stances and committal to conservative Sierra Leonean ideals of democracy, though more level-headed opponents of his instead attack his unbalanced focus on our urban areas. Alternatively, on the Right of the UNF divide is Amadu Wurie and his Protectorate Educative Progressive Union. A teacher by trade and the son of the paramount chief of the Fula people, Wurie is focused on education reform and combating the illiteracy epidemic while also developing the nation’s interior and rural expanses, additionally setting himself up as a bastion of Sierra Leonean tradition and culture resisting modernist degradation, though he has been accused of openly favoring the Muslim church too much despite his alleged secularist stances. As Sankoh’s liberals and Wurie’s conservatives bicker and compete for a shot at power, the wider nation is unsure if Margai and his United National Front will be able to weather the storm.",GFX_report_event_LIB_refugee_crisis_debate,,,no,yes,,,"tag = SIE
+has_government = social_conservative","log = ""[GetDateText]: [Root.GetName]: event sierra.1""",
+ghana.1,country_event,The Fate of Nkrumah’s Revolution,"Kwame Nkrumah, one of the most influential Pan-Africanist figures has come to lead his native home of Ghana in these turbulent times. The makeup of his government is yet to be decided; will the CPP continue down the moderate socialist course, or will Nkrumah take influence from the Internationale and other Syndicalist systems. Nkrumah could also embrace Totalist and Authoritarian Syndicalist Systems, making Ghana into a one-party state. This radical course however could draw Nkrumah’s detractors out of the woodworks..",,,,no,yes,,,"tag = GHA
+is_subject = no","log = ""[GetDateText]: [Root.GetName]: event ghana.1""",
+ghana.2,country_event,Coup against Nkrumah!,Nkrumah’s announcement of a Totalist One-Party State was almost immediately followed by a coup attempt from French and British Aligned Forces to place Premph II on the throne. After hours of chaotic battles in the capital...,,,,,yes,,,,"log = ""[GetDateText]: [Root.GetName]: event ghana.2""",
+flavornews.1,news_event,The 1936 Riga Winter Olympics,"For the fourth instance of the Winter Olympics, the German protectorate of the United Baltic Duchy was picked as the host nation, with Riga at the center. Funded by German taxpayer dollars, Riga has been outfitted with a plethora of new stadiums to accommodate the prestigious event. The Riga Olympics have the heaviest medals thus far in Winter Olympic history.
+As for the winners, first place went to Norway, carrying home seven gold medals. In second and third were Sweden and Germany respectively, with three and two gold medals.
+Russian athletes made a larger appearance than in the 1932 Montreal Olympics, Canada’s first as the exiled British Empire. Canadian athletes also participated, taking home one gold medal.",GFX_NEWS_riga_olympics,external,,,,,,wants_world_news = yes,,major = yes
+flavornews.2,news_event,The 1936 Vienna Summer Olympics,"As Austria's first round as an Olympic host city, the Danubian capital of Vienna has been selected for the Olympic stadiums. Austro-Hungarian laborers have built a new cultural complex, symbolically promoting unity via architecture.
+The 1936 Summer Olympics has also marked the first time Austria-Hungary has flown under one banner, a bright and tall flag showcasing heraldry all around the Habsburg lands. Unpopular in nationalist circles of Austria-Hungary but praised by the Germans in Austria. The largest Olympics yet, the Viennese Olympics has only expanded on the 1932 Dar-es-Salaam Olympics' worldwide roster. New sports include basketball, canoeing, and handball. In a glorious propaganda victory for Vienna, the Danubian team edged out one gold medal over Germany, solidifying Danubia's victory.",GFX_NEWS_vienna_olympics,external,,,,,,wants_world_news = yes,,major = yes
+flavornews.3,news_event,TODO,TODO,GFX_news_event_SPR_spanish_civil_war,external,,,,,,"wants_world_news = yes
+GER = {
+	OR = {
+		has_war_with = FRA
+		has_war_with = RUS
+		has_war_with = SOV
+	}
+}",,major = yes
+flavornews.4,news_event,TODO,TODO,GFX_news_event_SPR_spanish_civil_war,external,,,,,,"wants_world_news = yes
+NOT = {
+	GER = {
+		has_war_with = FRA
+	}
+	GER = {
+		has_war_with = RUS
+	}
+	GER = {
+		has_war_with = SOV
+	}
+}",,major = yes
+flavornews.5,news_event,TODO,TODO,GFX_news_event_SPR_spanish_civil_war,external,,,,,,wants_world_news = yes,,major = yes
+transylvania.1,country_event,Union with Romania?,"Finally Transylvania is independent from Hungary. We are a Romanian state and the population has since long desired to join our brethren in Romania, to form one state together. Finally, the dream of a Greater Romania can be achieved.",GFX_report_event_spain_civil_war_soldiers,mtth,,,yes,,3,"tag = TRS
+is_subject = no
+has_war = no
+country_exists = ROM
+ROM = { is_subject = no }","log = ""[GetDateText]: [Root.GetName]: event transylvania.1""",
+transylvania.2,country_event,Transylvania proclaims a Union with Romania,"Transylvania has managed to become independent from Hungary. Their government has unanimously declared a Union between Romania and Transylvania. Finally, we can welcome our brethren into one Greater Romania.",GFX_report_event_spain_civil_war_soldiers,,,,,,,,"log = ""[GetDateText]: [Root.GetName]: event transylvania.2""",
+kur.1,country_event,A Fragile Rebellion,"When the Sheikhs and Aghas planted their banners in the ground before the Diyarbakır Ulu Camii (Great Mosque of Diyarbakır), many doubted their capabilities to wage an effective war on the regime of the Kemalists. Nonetheless many also doubted that these forces would ever combine their arms in the first place.
+
+With railroads encroaching on the Kurdish domain, with Faith losing the status it deserves by the day and with Turkish intelectuals attempting to force their vision on our Grand Caliphate, many have seen the Light however with letters of support coming in from all across the Muslim world and volunteers, willing to fight for the Caliph, signing up in Diyarbakir. The cursed infidels of the capital will be shown the error of the ways very soon and the streets will run red with the blood of those opposing us. So let us go, restore the honour of our Caliph and save all Islam from this catastrophe!",GFX_OTT_Diyarabakir,external,,,yes,,,,"log = ""[GetDateText]: [Root.GetName]: event kur.1""",
+kur.2,country_event,Sulaymaniyah declares its independence,"Declared by the recently returned Sheikh Mahmut Barzinji, the city of Sulaymaniyah and the surrounding territory has decided to break with the Ottoman Empire and use the ruling chaos in the Mashriq to carve out a state of their own. This decisions comes a bit as a surprise for his former ally in [PER.GetName] who intended for him to destabilise the Porte but not declare a Kurdish state. Fearing support from their own Kurdish population for his cause, it remains currently unclear whether Iran will turn their guns on him before the situation could further deteriorate.",GFX_OTT_Sulaymaniyah_Issue,external,,,yes,,,check_variable = { 819.OTT_revolt_risk > 2 } #medium or above,"log = ""[GetDateText]: [Root.GetName]: event kur.2""",
+unit_leader.1,unit_leader_event,[From.From.GetName] Falls Ill,"In [From.From.GetHerHis] service to the nation, it seems [From.From.GetRank] [From.From.GetName] has pushed [From.From.GetHerselfHimself] too far. As a result of the bad climate in their operational area, the [From.From.GetRank] has now fallen ill, and will likely need some time to recover. Until [From.From.GetSheHe] gets well, [From.From.GetSheHe] will not be performing at [From.From.GetHerHis] usual level.",,external,,,,,,,"log = ""[GetDateText]: [Root.GetName]: event unit_leader.1""
+hidden_effect = {
+	FROM = {
+		set_unit_leader_flag = {
+			flag = recent_leader_event
+			value = 1
+			days = 180
+		}
+	}
+}",
+unit_leader.2,unit_leader_event,[From.From.GetName] Wounded,"In bringing the battle to a successful conclusion, it seems [From.From.GetRank] [From.From.GetName] put [From.From.GetHerselfHimself] at a bit too much risk while leading [From.From.GetHerHis] men. [From.From.GetSheHeCap] has been wounded, and it will likely take some time for the wounds to fully heal, until which time the [From.From.GetRank] will not be performing at [From.From.GetHerHis] usual level.",,external,,,,,,,"log = ""[GetDateText]: [Root.GetName]: event unit_leader.2""
+hidden_effect = {
+	FROM = {
+		set_unit_leader_flag = {
+			flag = recent_leader_event
+			value = 1
+			days = 360
+		}
+	}
+}",
+unit_leader.10,unit_leader_event,,,,external,,,,yes,,,"log = ""[GetDateText]: [Root.GetName]: event unit_leader.10""",
