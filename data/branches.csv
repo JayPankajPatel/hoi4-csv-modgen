@@ -1,0 +1,3 @@
+from_event,from_option,to_event,days,hours,random_days,condition
+mymod.1,1,mymod.2,2,,,
+mymod.1,2,mymod.3,5,,2,
