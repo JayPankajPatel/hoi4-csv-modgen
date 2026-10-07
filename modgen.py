@@ -10,6 +10,9 @@ Writes <out>/events/<mod>_events.txt
        <out>/localisation/english/<mod>_events_l_english.yml
        <out>/common/on_actions/<mod>_on_actions.txt   (only if fired_by uses an on_action)
 where <out> is mod_path from config.ini, or output/<mod>/ if it is not set.
+
+Usage: modgen.py [project_folder]
+The project folder holds config.ini and data/; it defaults to the folder modgen.py is in.
 """
 
 import configparser
@@ -20,7 +23,6 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).parent
-DATA = ROOT / "data"
 
 EVENT_TYPES = {"country_event", "news_event", "state_event", "unit_leader_event"}
 ID_RE = re.compile(r"^[A-Za-z0-9_]+\.\d+$")
@@ -44,8 +46,8 @@ GENERATED = "# GENERATED FILE - do not edit. Change the CSVs and re-run the gene
 
 
 # ---------------------------------------------------------------- helpers
-def read_csv(name, required):
-    path = DATA / name
+def read_csv(data, name, required):
+    path = data / name
     if not path.exists():
         sys.exit(f"ERROR: missing file {path}")
     # utf-8-sig strips the BOM that Excel adds
@@ -131,10 +133,10 @@ def loc_escape(text):
 
 
 # ---------------------------------------------------------------- load
-def load():
-    events = read_csv("events.csv", ["id", "title", "desc"])
-    options = read_csv("options.csv", ["event_id", "key", "name"])
-    branches = read_csv("branches.csv", ["from_event", "from_option", "to_event"])
+def load(data):
+    events = read_csv(data, "events.csv", ["id", "title", "desc"])
+    options = read_csv(data, "options.csv", ["event_id", "key", "name"])
+    branches = read_csv(data, "branches.csv", ["from_event", "from_option", "to_event"])
     return events, options, branches
 
 
@@ -456,13 +458,16 @@ def write(path, text, bom=False):
 
 def main():
     cfg = configparser.ConfigParser()
-    cfg.read(ROOT / "config.ini", encoding="utf-8")
+    project = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT
+    if not (project / "config.ini").is_file():
+        sys.exit(f"ERROR: no config.ini in {project}")
+    cfg.read(project / "config.ini", encoding="utf-8")
     mod_name = cfg.get("mod", "name", fallback="my_mod").strip()
     if not MOD_NAME_RE.match(mod_name):
         sys.exit(f"ERROR: config.ini name '{mod_name}' must be letters, digits and _ only (it is used in file names)")
     mod_path = cfg.get("mod", "mod_path", fallback="").strip()
 
-    events, options, branches = load()
+    events, options, branches = load(project / "data")
     errors, warnings, ev, opts = validate(events, options, branches)
 
     for w in warnings:
@@ -476,11 +481,11 @@ def main():
     if mod_path:
         out = Path(mod_path).expanduser()
         if not out.is_absolute():
-            out = ROOT / out
+            out = project / out
         if not out.is_dir():
             sys.exit(f"ERROR: config.ini mod_path '{mod_path}' is not an existing folder")
     else:
-        out = ROOT / "output" / mod_name
+        out = project / "output" / mod_name
 
     # Only ever touch files named after this mod, so other files in the mod folder are safe.
     write(out / "events" / f"{mod_name}_events.txt", gen_events(ev, opts, branches))

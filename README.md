@@ -20,7 +20,8 @@ don't need to install Python separately.
 - Windows (PowerShell): `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
 - macOS / Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
-Then run `uv run modgen.py` (or double-click `run.bat`). The Python version and dependencies
+Then run `uv run modgen.py` (or double-click `run.bat`). To keep several mods apart, give each
+its own folder with a `config.ini` and `data/`, and run `uv run modgen.py path/to/folder`. The Python version and dependencies
 are declared at the top of `modgen.py`.
 
 ## `config.ini`
