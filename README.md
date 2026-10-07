@@ -117,6 +117,7 @@ belongs to which option.
 | `to_event` | yes | Event to fire |
 | `days` / `hours` / `random_days` | no | Delay, whole numbers |
 | `condition` | no | Raw script trigger; branch only fires if true |
+| `hidden` | no | `yes` wraps the call in `hidden_effect`, so the option's tooltip doesn't reveal the follow-up event. |
 | `scope` | no | Who receives the event, e.g. `capital_scope`, `GER`, a state id. Required when the types differ (country/news event → state event or unit leader event). |
 
 An option can have several branches (several rows).

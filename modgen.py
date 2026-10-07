@@ -218,8 +218,6 @@ def validate(events, options, branches):
                 errors.append(f"{loc}: mtth_days '{mtth}' must be a whole number of days")
             elif triggered:
                 errors.append(f"{loc}: mtth_days does nothing on a triggered-only event; set fired_by = mtth")
-        elif not triggered and fired_by != "mtth":
-            warnings.append(f"{loc}: event '{e['id']}' is not triggered-only but has no mtth_days")
         e["_triggered_only"] = triggered
         e["_fired_by"] = fired_by
         fire_scope = e.get("fire_scope", "")
@@ -302,6 +300,10 @@ def validate(events, options, branches):
         for col in ("days", "hours", "random_days"):
             if b.get(col) and not re.fullmatch(r"\d+", b[col]):
                 errors.append(f"{loc}: {col} '{b[col]}' must be a whole number")
+        try:
+            b["_hidden"] = bool(parse_bool(b.get("hidden", "")))
+        except ValueError:
+            errors.append(f"{loc}: hidden '{b['hidden']}' must be yes, no, or blank")
         scope = b.get("scope", "")
         src_class, to_class = SCOPE_CLASS.get(ev[src]["_type"]), SCOPE_CLASS.get(ev[to]["_type"])
         if scope and not SCOPE_RE.match(scope):
@@ -391,6 +393,8 @@ def gen_events(ev, opts, branches):
                 call = f"{target_type} = {{ {' '.join(parts)} }}"
                 if b.get("scope"):
                     call = f"{b['scope']} = {{ {call} }}"
+                if b.get("_hidden"):
+                    call = f"hidden_effect = {{ {call} }}"  # no "fires in N days" tooltip
                 if b.get("condition"):
                     lines.append("\t\tif = {")
                     lines.append("\t\t\tlimit = {")
