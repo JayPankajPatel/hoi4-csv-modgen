@@ -1,5 +1,7 @@
 # HOI4 CSV Mod Generator
 
+[![Nightly](https://github.com/JayPankajPatel/hoi4-csv-modgen/actions/workflows/nightly.yml/badge.svg)](https://github.com/JayPankajPatel/hoi4-csv-modgen/actions/workflows/nightly.yml)
+
 Write your events in spreadsheets, run one command, get Paradox script and localisation.
 
 ## Workflow
