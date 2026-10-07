@@ -8,44 +8,77 @@
 Reads  data/events.csv, data/options.csv, data/branches.csv, config.ini
 Writes <out>/events/<mod>_events.txt
        <out>/localisation/english/<mod>_events_l_english.yml
-       <out>/common/on_actions/<mod>_on_actions.txt   (only if fired_by uses an on_action)
-where <out> is mod_path from config.ini, or output/<mod>/ if it is not set.
+       <out>/common/on_actions/<mod>_on_actions.txt
+           (only if fired_by uses an on_action)
+       <out>/gfx/event_pictures/<mod>_<slug>.png|dds
+       <out>/interface/<mod>_event_pictures.gfx
+           (only if a picture is an image path)
+where <out> is mod_path from config.ini, or output/<mod>/ if it is
+not set.
 
 Usage: modgen.py [project_folder]
-The project folder holds config.ini and data/; it defaults to the folder modgen.py is in.
+The project folder holds config.ini and data/; it defaults to the
+folder modgen.py is in.
 """
 
 import configparser
 import csv
+import os
 import re
+import shutil
+import struct
 import sys
 from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 
-EVENT_TYPES = {"country_event", "news_event", "state_event", "unit_leader_event"}
+EVENT_TYPES = {
+    "country_event",
+    "news_event",
+    "state_event",
+    "unit_leader_event",
+}
 ID_RE = re.compile(r"^[A-Za-z0-9_]+\.\d+$")
-# lowercase, not all digits (so a leftover option number is caught), not t/d (title/desc keys)
+# lowercase, not all digits (so a leftover option number is caught), not
+# t/d (title/desc keys)
 KEY_RE = re.compile(r"^(?!\d+$)[a-z0-9_]+$")
 RESERVED_KEYS = {"t", "d"}
 MOD_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 ON_ACTION_RE = re.compile(r"^on_[a-z0-9_]+$")
-# on_actions that run with no country in scope, so the event needs fire_scope to have a receiver
+# on_actions that run with no country in scope, so the event needs
+# fire_scope to have a receiver
 SCOPELESS_ON_ACTIONS = {"on_startup"}
-# which kind of scope each event type runs in; firing across kinds needs a `scope`
+# which kind of scope each event type runs in; firing across kinds needs
+# a `scope`
 SCOPE_CLASS = {
     "country_event": "country",
     "news_event": "country",
     "state_event": "state",
     "unit_leader_event": "unit leader",
 }
-SCOPE_HINT = {"country": "owner", "state": "capital_scope", "unit leader": "a unit leader scope"}
+SCOPE_HINT = {
+    "country": "owner",
+    "state": "capital_scope",
+    "unit leader": "a unit leader scope",
+}
 SCOPE_RE = re.compile(r"^[A-Za-z0-9_.:@]+$")
-GENERATED = "# GENERATED FILE - do not edit. Change the CSVs and re-run the generator."
+# a picture value is an image path (not a sprite name) if it has a / or
+# \ or ends in one of these
+IMAGE_EXTS = {".png", ".dds", ".tga", ".bmp", ".jpg", ".jpeg"}
+IMAGE_MAGIC = {
+    ".png": b"\x89PNG\r\n\x1a\n",
+    ".dds": b"DDS ",
+}  # the formats we copy as-is
+# sizes Kaiserreich uses; other event types aren't checked because their
+# sizes aren't known
+PICTURE_SIZE = {"country_event": (210, 176), "news_event": (397, 153)}
+GENERATED = (
+    "# GENERATED FILE - do not edit. Change the CSVs and re-run the generator."
+)
 
 
-# ---------------------------------------------------------------- helpers
+# -------------------------------------------------------------- helpers
 def read_csv(data, name, required):
     path = data / name
     if not path.exists():
@@ -55,7 +88,9 @@ def read_csv(data, name, required):
         reader = csv.DictReader(f)
         missing = [c for c in required if c not in (reader.fieldnames or [])]
         if missing:
-            sys.exit(f"ERROR: {name} is missing column(s): {', '.join(missing)}")
+            sys.exit(
+                f"ERROR: {name} is missing column(s): {', '.join(missing)}"
+            )
         rows = []
         for i, row in enumerate(reader, start=2):  # row 1 is the header
             row = {k.strip(): (v or "").strip() for k, v in row.items() if k}
@@ -71,7 +106,7 @@ FALSE_WORDS = {"no", "n", "false", "0"}
 
 
 def parse_bool(value):
-    """'' -> None, yes-ish -> True, no-ish -> False, anything else -> ValueError."""
+    """'' -> None, yes-ish -> True, no-ish -> False, else ValueError."""
     v = value.lower()
     if v == "":
         return None
@@ -101,7 +136,7 @@ def brace_counts(line):
 
 
 def brace_problem(text):
-    """Return a description of unbalanced braces in a raw script cell, or None."""
+    """Describe unbalanced braces in a raw script cell, or None."""
     depth = 0
     for line in text.split("\n"):
         opens, closes = brace_counts(line)
@@ -136,15 +171,20 @@ def loc_escape(text):
 def load(data):
     events = read_csv(data, "events.csv", ["id", "title", "desc"])
     options = read_csv(data, "options.csv", ["event_id", "key", "name"])
-    branches = read_csv(data, "branches.csv", ["from_event", "from_option", "to_event"])
+    branches = read_csv(
+        data, "branches.csv", ["from_event", "from_option", "to_event"]
+    )
     return events, options, branches
 
 
-# ---------------------------------------------------------------- validate
+# ------------------------------------------------------------- validate
 def validate(events, options, branches):
     errors, warnings = [], []
     ev = {}
-    bad_ids, bad_keys = set(), set()  # already reported; references to them are skipped quietly
+    bad_ids, bad_keys = (
+        set(),
+        set(),
+    )  # already reported; references to them are skipped quietly
 
     def check_script(loc, row, cols):
         for col in cols:
@@ -155,15 +195,24 @@ def validate(events, options, branches):
     for e in events:
         loc = f"events.csv line {e['_line']}"
         if not ID_RE.match(e["id"]):
-            errors.append(f"{loc}: id '{e['id']}' must look like namespace.number (e.g. mymod.1)")
+            errors.append(
+                f"{loc}: id '{e['id']}' must look like namespace.number (e.g. "
+                "mymod.1)"
+            )
             bad_ids.add(e["id"])
             continue
         if e["id"] in ev:
-            errors.append(f"{loc}: duplicate event id '{e['id']}' (first used on line {ev[e['id']]['_line']})")
+            errors.append(
+                f"{loc}: duplicate event id '{e['id']}' (first used on line "
+                f"{ev[e['id']]['_line']})"
+            )
             continue
         etype = e.get("type") or "country_event"
         if etype not in EVENT_TYPES:
-            errors.append(f"{loc}: type '{etype}' must be one of {', '.join(sorted(EVENT_TYPES))}")
+            errors.append(
+                f"{loc}: type '{etype}' must be one of "
+                f"{', '.join(sorted(EVENT_TYPES))}"
+            )
         e["_type"] = etype
 
         flags = {}
@@ -171,7 +220,9 @@ def validate(events, options, branches):
             try:
                 flags[col] = parse_bool(e.get(col, ""))
             except ValueError:
-                errors.append(f"{loc}: {col} '{e[col]}' must be yes, no, or blank")
+                errors.append(
+                    f"{loc}: {col} '{e[col]}' must be yes, no, or blank"
+                )
                 flags[col] = None
         e["_fire_only_once"] = bool(flags["fire_only_once"])
         e["_hidden"] = bool(flags["hidden"])
@@ -181,14 +232,16 @@ def validate(events, options, branches):
         if not e["desc"] and not e["_hidden"]:
             warnings.append(f"{loc}: event '{e['id']}' has no description")
 
-        # fired_by decides how the event starts; triggered_only must agree with it
+        # fired_by decides how the event starts; triggered_only must
+        # agree with it
         triggered = flags["triggered_only"]
         fired_by = e.get("fired_by", "")
         mtth = e.get("mtth_days", "")
         if fired_by == "mtth":
             if triggered:
                 errors.append(
-                    f"{loc}: fired_by = mtth means the event fires on its own; "
+                    f"{loc}: fired_by = mtth means the event fires on its "
+                    "own; "
                     f"set triggered_only to no or leave it blank"
                 )
             triggered = False
@@ -203,31 +256,46 @@ def validate(events, options, branches):
             triggered = True
             if fired_by in SCOPELESS_ON_ACTIONS and not e.get("fire_scope"):
                 errors.append(
-                    f"{loc}: {fired_by} has no country in scope; set fire_scope to who gets the event "
+                    f"{loc}: {fired_by} has no country in scope; set "
+                    "fire_scope to who gets the event "
                     f"(e.g. GER, or every_country and limit it with trigger)"
                 )
-            elif etype not in ("country_event", "news_event") and not e.get("fire_scope"):
+            elif etype not in ("country_event", "news_event") and not e.get(
+                "fire_scope"
+            ):
                 warnings.append(
-                    f"{loc}: {etype} '{e['id']}' is fired from {fired_by}; check that on_action runs in the right scope"
+                    f"{loc}: {etype} '{e['id']}' is fired from {fired_by}; "
+                    "check that on_action runs in the right scope"
                 )
         elif fired_by not in ("", "external"):
             errors.append(
-                f"{loc}: fired_by '{fired_by}' must be blank, external, mtth, or an on_action such as on_startup"
+                f"{loc}: fired_by '{fired_by}' must be blank, external, mtth, "
+                "or an on_action such as on_startup"
             )
         if triggered is None:
             triggered = True
         if mtth:
             if not re.fullmatch(r"[1-9]\d*", mtth):
-                errors.append(f"{loc}: mtth_days '{mtth}' must be a whole number of days")
+                errors.append(
+                    f"{loc}: mtth_days '{mtth}' must be a whole number of days"
+                )
             elif triggered:
-                errors.append(f"{loc}: mtth_days does nothing on a triggered-only event; set fired_by = mtth")
+                errors.append(
+                    f"{loc}: mtth_days does nothing on a triggered-only "
+                    "event; set fired_by = mtth"
+                )
         e["_triggered_only"] = triggered
         e["_fired_by"] = fired_by
         fire_scope = e.get("fire_scope", "")
         if fire_scope and not SCOPE_RE.match(fire_scope):
-            errors.append(f"{loc}: fire_scope '{fire_scope}' must be a single scope, e.g. GER or every_country")
+            errors.append(
+                f"{loc}: fire_scope '{fire_scope}' must be a single scope, "
+                "e.g. GER or every_country"
+            )
         elif fire_scope and not ON_ACTION_RE.match(fired_by):
-            errors.append(f"{loc}: fire_scope only applies when fired_by is an on_action")
+            errors.append(
+                f"{loc}: fire_scope only applies when fired_by is an on_action"
+            )
         check_script(loc, e, ("trigger", "immediate", "extra"))
         ev[e["id"]] = e
 
@@ -237,26 +305,43 @@ def validate(events, options, branches):
         if o["event_id"] in bad_ids:
             continue
         if o["event_id"] not in ev:
-            errors.append(f"{loc}: event_id '{o['event_id']}' does not exist in events.csv")
+            errors.append(
+                f"{loc}: event_id '{o['event_id']}' does not exist in "
+                "events.csv"
+            )
             continue
         key = o["key"]
         if not KEY_RE.match(key) or key in RESERVED_KEYS:
             errors.append(
-                f"{loc}: key '{key}' must be lowercase letters, digits and _, not only digits, "
+                f"{loc}: key '{key}' must be lowercase letters, digits and _, "
+                "not only digits, "
                 f"and not 't' or 'd' (e.g. mobilize)"
             )
             bad_keys.add((o["event_id"], key))
             continue
         if any(other["key"] == key for other in opts[o["event_id"]]):
-            errors.append(f"{loc}: event '{o['event_id']}' already has an option with key '{key}'")
+            errors.append(
+                f"{loc}: event '{o['event_id']}' already has an option with "
+                f"key '{key}'"
+            )
             continue
         if not o["name"] and not ev[o["event_id"]]["_hidden"]:
-            errors.append(f"{loc}: option '{key}' of '{o['event_id']}' has no name")
+            errors.append(
+                f"{loc}: option '{key}' of '{o['event_id']}' has no name"
+            )
         if o.get("order") and not re.fullmatch(r"-?\d+", o["order"]):
-            errors.append(f"{loc}: order '{o['order']}' must be a whole number")
-            o["_bad_order"] = True  # already reported; keep the option so later checks don't cascade
+            errors.append(
+                f"{loc}: order '{o['order']}' must be a whole number"
+            )
+            o["_bad_order"] = (
+                # already reported; keep the option so later checks
+                # don't cascade
+                True
+            )
         check_script(loc, o, ("effects", "trigger", "extra"))
-        if o.get("ai_chance") and not re.fullmatch(r"-?\d+(\.\d+)?", o["ai_chance"]):
+        if o.get("ai_chance") and not re.fullmatch(
+            r"-?\d+(\.\d+)?", o["ai_chance"]
+        ):
             check_script(loc, o, ("ai_chance",))
         opts[o["event_id"]].append(o)
 
@@ -266,17 +351,24 @@ def validate(events, options, branches):
         with_order = [o for o in olist if o.get("order")]
         if with_order and len(with_order) != len(olist):
             errors.append(
-                f"options.csv: event '{eid}' has an order on some options but not all; fill in every row or none"
+                f"options.csv: event '{eid}' has an order on some options but "
+                "not all; fill in every row or none"
             )
         elif with_order:
-            olist.sort(key=lambda o: int(o["order"]))  # stable: ties keep row order
+            olist.sort(
+                key=lambda o: int(o["order"])
+            )  # stable: ties keep row order
 
     for eid, e in ev.items():
         if not opts[eid] and not e["_hidden"]:
-            errors.append(f"events.csv line {e['_line']}: event '{eid}' has no options in options.csv")
+            errors.append(
+                f"events.csv line {e['_line']}: event '{eid}' has no options "
+                "in options.csv"
+            )
         if e["_hidden"] and len(opts[eid]) > 1:
             warnings.append(
-                f"events.csv line {e['_line']}: hidden event '{eid}' has {len(opts[eid])} options; "
+                f"events.csv line {e['_line']}: hidden event '{eid}' has "
+                f"{len(opts[eid])} options; "
                 f"nobody sees the choice"
             )
 
@@ -284,37 +376,61 @@ def validate(events, options, branches):
     for b in branches:
         loc = f"branches.csv line {b['_line']}"
         src, to = b["from_event"], b["to_event"]
-        if src in bad_ids or to in bad_ids or (src, b["from_option"]) in bad_keys:
+        if (
+            src in bad_ids
+            or to in bad_ids
+            or (src, b["from_option"]) in bad_keys
+        ):
             continue
         if src not in ev:
             errors.append(f"{loc}: from_event '{src}' does not exist")
             continue
         if to not in ev:
-            errors.append(f"{loc}: to_event '{to}' does not exist (fired from '{src}' option {b['from_option']})")
+            errors.append(
+                f"{loc}: to_event '{to}' does not exist (fired from '{src}' "
+                f"option {b['from_option']})"
+            )
             continue
         keys = [o["key"] for o in opts[src]]
         if b["from_option"] not in keys:
-            hint = " (from_option takes the option's key, not its number)" if b["from_option"].isdigit() else ""
+            hint = (
+                " (from_option takes the option's key, not its number)"
+                if b["from_option"].isdigit()
+                else ""
+            )
             errors.append(
-                f"{loc}: from_option '{b['from_option']}' is not an option key of '{src}'{hint}; "
+                f"{loc}: from_option '{b['from_option']}' is not an option "
+                f"key of '{src}'{hint}; "
                 f"its keys are: {', '.join(keys) or 'none'}"
             )
             continue
         for col in ("days", "hours", "random_days"):
             if b.get(col) and not re.fullmatch(r"\d+", b[col]):
-                errors.append(f"{loc}: {col} '{b[col]}' must be a whole number")
+                errors.append(
+                    f"{loc}: {col} '{b[col]}' must be a whole number"
+                )
         try:
             b["_hidden"] = bool(parse_bool(b.get("hidden", "")))
         except ValueError:
-            errors.append(f"{loc}: hidden '{b['hidden']}' must be yes, no, or blank")
+            errors.append(
+                f"{loc}: hidden '{b['hidden']}' must be yes, no, or blank"
+            )
         scope = b.get("scope", "")
-        src_class, to_class = SCOPE_CLASS.get(ev[src]["_type"]), SCOPE_CLASS.get(ev[to]["_type"])
+        src_class, to_class = (
+            SCOPE_CLASS.get(ev[src]["_type"]),
+            SCOPE_CLASS.get(ev[to]["_type"]),
+        )
         if scope and not SCOPE_RE.match(scope):
-            errors.append(f"{loc}: scope '{scope}' must be a single scope, e.g. capital_scope, GER, 64")
+            errors.append(
+                f"{loc}: scope '{scope}' must be a single scope, e.g. "
+                "capital_scope, GER, 64"
+            )
         elif not scope and src_class and to_class and src_class != to_class:
             errors.append(
-                f"{loc}: '{to}' is a {ev[to]['_type']} but '{src}' is a {ev[src]['_type']}; "
-                f"set scope to say which {to_class} gets it (e.g. {SCOPE_HINT[to_class]})"
+                f"{loc}: '{to}' is a {ev[to]['_type']} but '{src}' is a "
+                f"{ev[src]['_type']}; "
+                f"set scope to say which {to_class} gets it (e.g. "
+                f"{SCOPE_HINT[to_class]})"
             )
         check_script(loc, b, ("condition",))
         incoming.add(to)
@@ -322,15 +438,18 @@ def validate(events, options, branches):
     for eid, e in ev.items():
         if e["_triggered_only"] and not e["_fired_by"] and eid not in incoming:
             warnings.append(
-                f"event '{eid}' is triggered-only but nothing fires it; set fired_by "
+                f"event '{eid}' is triggered-only but nothing fires it; set "
+                "fired_by "
                 f"(e.g. on_startup, or external if a focus/decision fires it)"
             )
     return errors, warnings, ev, opts
 
 
-# ---------------------------------------------------------------- generate
+# ------------------------------------------------------------- generate
 def gen_events(ev, opts, branches):
-    out_by = defaultdict(lambda: defaultdict(list))  # event -> option key -> branches
+    out_by = defaultdict(
+        lambda: defaultdict(list)
+    )  # event -> option key -> branches
     for b in branches:
         out_by[b["from_event"]][b["from_option"]].append(b)
 
@@ -352,7 +471,7 @@ def gen_events(ev, opts, branches):
         if e["desc"]:
             lines.append(f"\tdesc = {eid}.d")
         if e.get("picture"):
-            lines.append(f"\tpicture = {e['picture']}")
+            lines.append(f"\tpicture = {e.get('_sprite') or e['picture']}")
         if e["_hidden"]:
             lines.append("\thidden = yes")
         if e["_triggered_only"]:
@@ -360,7 +479,9 @@ def gen_events(ev, opts, branches):
         if e["_fire_only_once"]:
             lines.append("\tfire_only_once = yes")
         if e.get("mtth_days"):
-            lines.append(f"\tmean_time_to_happen = {{ days = {e['mtth_days']} }}")
+            lines.append(
+                f"\tmean_time_to_happen = {{ days = {e['mtth_days']} }}"
+            )
         if e.get("trigger"):
             lines.append("\ttrigger = {")
             lines += fmt_block(e["trigger"], 2)
@@ -400,7 +521,8 @@ def gen_events(ev, opts, branches):
                 if b.get("scope"):
                     call = f"{b['scope']} = {{ {call} }}"
                 if b.get("_hidden"):
-                    call = f"hidden_effect = {{ {call} }}"  # no "fires in N days" tooltip
+                    # no "fires in N days" tooltip
+                    call = f"hidden_effect = {{ {call} }}"
                 if b.get("condition"):
                     lines.append("\t\tif = {")
                     lines.append("\t\t\tlimit = {")
@@ -450,6 +572,144 @@ def gen_loc(ev, opts):
     return "\n".join(lines) + "\n"
 
 
+# ------------------------------------------------------------- pictures
+def is_picture_path(value):
+    value = value.replace("\\", "/")
+    return "/" in value or Path(value).suffix.lower() in IMAGE_EXTS
+
+
+def image_size(head, ext):
+    """(width, height) from the first 24 bytes of a PNG/DDS, or None."""
+    if len(head) < 24:
+        return None
+    if ext == ".png":
+        return struct.unpack(">II", head[16:24])
+    height, width = struct.unpack("<II", head[12:20])
+    return width, height
+
+
+def check_pictures(ev, project, mod_name):
+    """Resolve image paths in the picture column.
+
+    Returns errors, warnings and {slug: source file}; sets
+    e["_sprite"] on events that use an image.
+    """
+    errors, warnings, images, first_line = [], [], {}, {}
+    for e in ev.values():
+        value = e.get("picture", "")
+        if not value or not is_picture_path(value):
+            continue
+        loc = f"events.csv line {e['_line']}"
+        src = (project / value.replace("\\", "/")).resolve()
+        try:
+            rel = src.relative_to(project)
+        except ValueError:
+            errors.append(
+                f"{loc}: picture '{value}' is outside the project folder; put "
+                "images inside it "
+                "(the sprite name and the copy are built from the path "
+                "relative to it)"
+            )
+            continue
+        if not src.is_file():
+            errors.append(
+                f"{loc}: picture file '{value}' not found (paths are relative "
+                f"to {project})"
+            )
+            continue
+        ext = src.suffix.lower()
+        if ext not in IMAGE_MAGIC:
+            errors.append(
+                f"{loc}: picture '{value}' must be a .png or .dds file"
+            )
+            continue
+        with open(src, "rb") as f:
+            head = f.read(24)
+        if not head.startswith(IMAGE_MAGIC[ext]):
+            errors.append(
+                f"{loc}: picture '{value}' is not really a {ext} file (was it "
+                "renamed?)"
+            )
+            continue
+        slug = re.sub(
+            r"[^a-z0-9]+", "_", rel.with_suffix("").as_posix().lower()
+        ).strip("_")
+        if not slug:
+            errors.append(
+                f"{loc}: picture '{value}' needs a file name with letters or "
+                "digits in it"
+            )
+            continue
+        if slug in images and not os.path.samefile(images[slug], src):
+            errors.append(
+                f"{loc}: picture '{value}' and the one on line "
+                f"{first_line[slug]} would both be named "
+                f"{slug}; rename one of the files"
+            )
+            continue
+        images.setdefault(slug, src)
+        first_line.setdefault(slug, e["_line"])
+        expected = PICTURE_SIZE.get(e["_type"])
+        size = image_size(head, ext)
+        if expected and size and tuple(size) != expected:
+            warnings.append(
+                f"{loc}: picture '{value}' is {size[0]}x{size[1]}; "
+                f"{e['_type']} pictures are usually "
+                f"{expected[0]}x{expected[1]}"
+            )
+        e["_sprite"] = f"GFX_{mod_name}_{slug}"
+    return errors, warnings, images
+
+
+def gen_gfx(images, mod_name):
+    lines = [GENERATED, "", "spriteTypes = {"]
+    for slug, src in images.items():
+        lines += [
+            "\tspriteType = {",
+            f'\t\tname = "GFX_{mod_name}_{slug}"',
+            "\t\ttexturefile = "
+            f'"gfx/event_pictures/{mod_name}_{slug}{src.suffix.lower()}"',
+            "\t}",
+        ]
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def write_pictures(out, images, mod_name):
+    """Copy images, remove unused ones an earlier run wrote, write .gfx.
+
+    The .gfx is written last: it lists what the generator owns.
+    """
+    pic_dir = out / "gfx" / "event_pictures"
+    gfx_file = out / "interface" / f"{mod_name}_event_pictures.gfx"
+    wanted = set()
+    for slug, src in images.items():
+        dest = pic_dir / f"{mod_name}_{slug}{src.suffix.lower()}"
+        wanted.add(dest.name)
+        if not (dest.exists() and dest.read_bytes() == src.read_bytes()):
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dest)
+
+    old = gfx_file.read_text(encoding="utf-8") if gfx_file.exists() else ""
+    if old.startswith(GENERATED):
+        for texture in re.findall(r'texturefile\s*=\s*"([^"]+)"', old):
+            stale = (out / texture).resolve()
+            # only files this generator could have written:
+            # <out>/gfx/event_pictures/<mod>_*
+            if (
+                stale.parent == pic_dir.resolve()
+                and stale.name.startswith(f"{mod_name}_")
+                and stale.name not in wanted
+                and stale.is_file()
+            ):
+                stale.unlink()
+
+    if images:
+        write(gfx_file, gen_gfx(images, mod_name))
+    elif old.startswith(GENERATED):
+        gfx_file.unlink()
+
+
 # ---------------------------------------------------------------- main
 def write(path, text, bom=False):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -458,17 +718,29 @@ def write(path, text, bom=False):
 
 def main():
     cfg = configparser.ConfigParser()
-    project = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT
+    # resolved, so image paths (also resolved) compare correctly through
+    # symlinks and mapped drives
+    project = (Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT).resolve()
     if not (project / "config.ini").is_file():
         sys.exit(f"ERROR: no config.ini in {project}")
     cfg.read(project / "config.ini", encoding="utf-8")
     mod_name = cfg.get("mod", "name", fallback="my_mod").strip()
     if not MOD_NAME_RE.match(mod_name):
-        sys.exit(f"ERROR: config.ini name '{mod_name}' must be letters, digits and _ only (it is used in file names)")
+        sys.exit(
+            f"ERROR: config.ini name '{mod_name}' must be letters, digits and "
+            "_ only (it is used in file names)"
+        )
     mod_path = cfg.get("mod", "mod_path", fallback="").strip()
 
     events, options, branches = load(project / "data")
     errors, warnings, ev, opts = validate(events, options, branches)
+    images = {}
+    if not errors:  # image checks need valid events
+        pic_errors, pic_warnings, images = check_pictures(
+            ev, project, mod_name
+        )
+        errors += pic_errors
+        warnings += pic_warnings
 
     for w in warnings:
         print("WARNING:", w)
@@ -476,28 +748,52 @@ def main():
         print()
         for err in errors:
             print("ERROR:", err)
-        sys.exit(f"\n{len(errors)} error(s) found. Nothing was generated. Fix the CSVs and run again.")
+        sys.exit(
+            f"\n{len(errors)} error(s) found. Nothing was generated. Fix the "
+            "CSVs and run again."
+        )
 
     if mod_path:
         out = Path(mod_path).expanduser()
         if not out.is_absolute():
             out = project / out
         if not out.is_dir():
-            sys.exit(f"ERROR: config.ini mod_path '{mod_path}' is not an existing folder")
+            sys.exit(
+                f"ERROR: config.ini mod_path '{mod_path}' is not an existing "
+                "folder"
+            )
     else:
         out = project / "output" / mod_name
 
-    # Only ever touch files named after this mod, so other files in the mod folder are safe.
-    write(out / "events" / f"{mod_name}_events.txt", gen_events(ev, opts, branches))
-    # HOI4 localisation must be UTF-8 WITH BOM, and the name must end in _l_english.yml
-    write(out / "localisation" / "english" / f"{mod_name}_events_l_english.yml", gen_loc(ev, opts), bom=True)
-    on_actions_file = out / "common" / "on_actions" / f"{mod_name}_on_actions.txt"
+    # Only ever touch files named after this mod, so other files in the
+    # mod folder are safe.
+    write(
+        out / "events" / f"{mod_name}_events.txt",
+        gen_events(ev, opts, branches),
+    )
+    # HOI4 localisation must be UTF-8 WITH BOM, and the name must end in
+    # _l_english.yml
+    write(
+        out / "localisation" / "english" / f"{mod_name}_events_l_english.yml",
+        gen_loc(ev, opts),
+        bom=True,
+    )
+    on_actions_file = (
+        out / "common" / "on_actions" / f"{mod_name}_on_actions.txt"
+    )
     on_actions = gen_on_actions(ev)
     if on_actions:
         write(on_actions_file, on_actions)
-    elif on_actions_file.exists() and on_actions_file.read_text(encoding="utf-8").startswith(GENERATED):
-        on_actions_file.unlink()  # stale from an earlier run; it would still fire old events
-    print(f"\nOK: {len(ev)} events, {sum(len(v) for v in opts.values())} options written to {out}")
+    elif on_actions_file.exists() and on_actions_file.read_text(
+        encoding="utf-8"
+    ).startswith(GENERATED):
+        # stale from an earlier run; it would still fire old events
+        on_actions_file.unlink()
+    write_pictures(out, images, mod_name)
+    print(
+        f"\nOK: {len(ev)} events, {sum(len(v) for v in opts.values())} "
+        f"options written to {out}"
+    )
 
 
 if __name__ == "__main__":

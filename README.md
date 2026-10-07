@@ -1,5 +1,7 @@
 # HOI4 CSV Mod Generator
 
+[![Nightly](https://github.com/JayPankajPatel/hoi4-csv-modgen/actions/workflows/nightly.yml/badge.svg)](https://github.com/JayPankajPatel/hoi4-csv-modgen/actions/workflows/nightly.yml)
+
 Write your events in spreadsheets, run one command, get Paradox script and localisation.
 
 ## Workflow
@@ -39,6 +41,8 @@ mod_path = C:/Users/you/Documents/Paradox Interactive/Hearts of Iron IV/mod/my_m
   - `events/<name>_events.txt`
   - `localisation/english/<name>_events_l_english.yml`
   - `common/on_actions/<name>_on_actions.txt` (only if an event uses an on_action in `fired_by`)
+  - `gfx/event_pictures/<name>_<slug>.png` / `.dds` and `interface/<name>_event_pictures.gfx`
+    (only if a `picture` is an image path)
 
   Nothing else in the folder is touched.
 
@@ -52,7 +56,7 @@ mod_path = C:/Users/you/Documents/Paradox Interactive/Hearts of Iron IV/mod/my_m
 | `type` | no | `country_event` (default), `news_event`, `state_event`, `unit_leader_event` |
 | `title` | yes | Event title text |
 | `desc` | yes | Event description text |
-| `picture` | no | GFX name, e.g. `GFX_report_event_generic_read_write` |
+| `picture` | no | A sprite name (`GFX_report_event_generic_read_write`) or a path to your own `.png`/`.dds`, e.g. `pictures/crisis.png`. See [Custom pictures](#custom-pictures). |
 | `fired_by` | no | How the event starts; see below. |
 | `fire_scope` | no | Who receives the event when `fired_by` is an on_action, e.g. `GER` or `every_country`. Required for `on_startup`. |
 | `triggered_only` | no | `yes` (default) / `no`. Usually leave blank and let `fired_by` decide. |
@@ -125,6 +129,22 @@ An option can have several branches (several rows).
 
 With `scope`, the call is wrapped: `capital_scope = { state_event = { id = mymod.5 } }`.
 
+## Custom pictures
+
+Put the image in the project folder and write its path in `picture`, e.g. `pictures/crisis.png`
+(`\` works too). A value is read as a path when it contains `/` or `\` or ends in an image
+extension; anything else is a sprite name, as before.
+
+The generator copies the image to `gfx/event_pictures/<name>_<slug>.png`, registers it in
+`interface/<name>_event_pictures.gfx`, and uses the sprite `GFX_<name>_<slug>`. The slug comes
+from the path: `pictures/War Room.png` → `GFX_my_mod_pictures_war_room`. Several events can
+share one image.
+
+- `.png` and `.dds` are copied unchanged. HOI4 reads PNG directly, so there's no conversion.
+- Usual sizes: 210×176 for country events, 397×153 for news events. Other sizes give a warning.
+- When a picture is no longer used, its copy is deleted. Only files listed in the generated
+  `.gfx` and named `<name>_...` inside `gfx/event_pictures/` are ever removed.
+
 ## Writing raw script cells
 
 Effects and triggers are plain Paradox script. Put one statement per line inside the cell
@@ -152,7 +172,7 @@ Generated automatically:
 
 Before writing anything, the generator reports plain-English errors (duplicate ids,
 unknown event ids, unknown option keys, events with no options, `fired_by` that contradicts
-`triggered_only`) and stops.
+`triggered_only`, missing or unsupported picture files) and stops.
 Warnings (such as an event nothing fires) don't stop the run.
 
 It can't check game logic. Typos in effect names show up in HOI4's `error.log`.
