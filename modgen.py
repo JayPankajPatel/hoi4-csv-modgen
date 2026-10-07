@@ -9,6 +9,8 @@ Reads  data/events.csv, data/options.csv, data/branches.csv, config.ini
 Writes <out>/events/<mod>_events.txt
        <out>/localisation/english/<mod>_events_l_english.yml
        <out>/common/on_actions/<mod>_on_actions.txt   (only if fired_by uses an on_action)
+       <out>/gfx/event_pictures/<mod>_<slug>.png|dds  (only if picture is an image path)
+       <out>/interface/<mod>_event_pictures.gfx
 where <out> is mod_path from config.ini, or output/<mod>/ if it is not set.
 
 Usage: modgen.py [project_folder]
@@ -17,7 +19,10 @@ The project folder holds config.ini and data/; it defaults to the folder modgen.
 
 import configparser
 import csv
+import os
 import re
+import shutil
+import struct
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -42,6 +47,11 @@ SCOPE_CLASS = {
 }
 SCOPE_HINT = {"country": "owner", "state": "capital_scope", "unit leader": "a unit leader scope"}
 SCOPE_RE = re.compile(r"^[A-Za-z0-9_.:@]+$")
+# a picture value is an image path (not a sprite name) if it has a / or \ or ends in one of these
+IMAGE_EXTS = {".png", ".dds", ".tga", ".bmp", ".jpg", ".jpeg"}
+IMAGE_MAGIC = {".png": b"\x89PNG\r\n\x1a\n", ".dds": b"DDS "}  # the formats we copy as-is
+# sizes Kaiserreich uses; other event types aren't checked because their sizes aren't known
+PICTURE_SIZE = {"country_event": (210, 176), "news_event": (397, 153)}
 GENERATED = "# GENERATED FILE - do not edit. Change the CSVs and re-run the generator."
 
 
@@ -352,7 +362,7 @@ def gen_events(ev, opts, branches):
         if e["desc"]:
             lines.append(f"\tdesc = {eid}.d")
         if e.get("picture"):
-            lines.append(f"\tpicture = {e['picture']}")
+            lines.append(f"\tpicture = {e.get('_sprite') or e['picture']}")
         if e["_hidden"]:
             lines.append("\thidden = yes")
         if e["_triggered_only"]:
@@ -450,6 +460,121 @@ def gen_loc(ev, opts):
     return "\n".join(lines) + "\n"
 
 
+# ---------------------------------------------------------------- pictures
+def is_picture_path(value):
+    value = value.replace("\\", "/")
+    return "/" in value or Path(value).suffix.lower() in IMAGE_EXTS
+
+
+def image_size(head, ext):
+    """(width, height) from the first 24 bytes of a PNG or DDS file, or None."""
+    if len(head) < 24:
+        return None
+    if ext == ".png":
+        return struct.unpack(">II", head[16:24])
+    height, width = struct.unpack("<II", head[12:20])
+    return width, height
+
+
+def check_pictures(ev, project, mod_name):
+    """Resolve image paths in the picture column.
+
+    Returns errors, warnings and {slug: source file}; sets e["_sprite"] on events that use an image.
+    """
+    errors, warnings, images, first_line = [], [], {}, {}
+    for e in ev.values():
+        value = e.get("picture", "")
+        if not value or not is_picture_path(value):
+            continue
+        loc = f"events.csv line {e['_line']}"
+        src = (project / value.replace("\\", "/")).resolve()
+        try:
+            rel = src.relative_to(project)
+        except ValueError:
+            errors.append(
+                f"{loc}: picture '{value}' is outside the project folder; put images inside it "
+                f"(the sprite name and the copy are built from the path relative to it)"
+            )
+            continue
+        if not src.is_file():
+            errors.append(f"{loc}: picture file '{value}' not found (paths are relative to {project})")
+            continue
+        ext = src.suffix.lower()
+        if ext not in IMAGE_MAGIC:
+            errors.append(f"{loc}: picture '{value}' must be a .png or .dds file")
+            continue
+        with open(src, "rb") as f:
+            head = f.read(24)
+        if not head.startswith(IMAGE_MAGIC[ext]):
+            errors.append(f"{loc}: picture '{value}' is not really a {ext} file (was it renamed?)")
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "_", rel.with_suffix("").as_posix().lower()).strip("_")
+        if not slug:
+            errors.append(f"{loc}: picture '{value}' needs a file name with letters or digits in it")
+            continue
+        if slug in images and not os.path.samefile(images[slug], src):
+            errors.append(
+                f"{loc}: picture '{value}' and the one on line {first_line[slug]} would both be named "
+                f"{slug}; rename one of the files"
+            )
+            continue
+        images.setdefault(slug, src)
+        first_line.setdefault(slug, e["_line"])
+        expected = PICTURE_SIZE.get(e["_type"])
+        size = image_size(head, ext)
+        if expected and size and tuple(size) != expected:
+            warnings.append(
+                f"{loc}: picture '{value}' is {size[0]}x{size[1]}; {e['_type']} pictures are usually "
+                f"{expected[0]}x{expected[1]}"
+            )
+        e["_sprite"] = f"GFX_{mod_name}_{slug}"
+    return errors, warnings, images
+
+
+def gen_gfx(images, mod_name):
+    lines = [GENERATED, "", "spriteTypes = {"]
+    for slug, src in images.items():
+        lines += [
+            "\tspriteType = {",
+            f'\t\tname = "GFX_{mod_name}_{slug}"',
+            f'\t\ttexturefile = "gfx/event_pictures/{mod_name}_{slug}{src.suffix.lower()}"',
+            "\t}",
+        ]
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def write_pictures(out, images, mod_name):
+    """Copy images, remove ones an earlier run wrote that are no longer used, then write the .gfx last."""
+    pic_dir = out / "gfx" / "event_pictures"
+    gfx_file = out / "interface" / f"{mod_name}_event_pictures.gfx"
+    wanted = set()
+    for slug, src in images.items():
+        dest = pic_dir / f"{mod_name}_{slug}{src.suffix.lower()}"
+        wanted.add(dest.name)
+        if not (dest.exists() and dest.read_bytes() == src.read_bytes()):
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src, dest)
+
+    old = gfx_file.read_text(encoding="utf-8") if gfx_file.exists() else ""
+    if old.startswith(GENERATED):
+        for texture in re.findall(r'texturefile\s*=\s*"([^"]+)"', old):
+            stale = (out / texture).resolve()
+            # only files this generator could have written: <out>/gfx/event_pictures/<mod>_*
+            if (
+                stale.parent == pic_dir.resolve()
+                and stale.name.startswith(f"{mod_name}_")
+                and stale.name not in wanted
+                and stale.is_file()
+            ):
+                stale.unlink()
+
+    if images:
+        write(gfx_file, gen_gfx(images, mod_name))
+    elif old.startswith(GENERATED):
+        gfx_file.unlink()
+
+
 # ---------------------------------------------------------------- main
 def write(path, text, bom=False):
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -458,7 +583,8 @@ def write(path, text, bom=False):
 
 def main():
     cfg = configparser.ConfigParser()
-    project = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT
+    # resolved, so image paths (also resolved) compare correctly through symlinks and mapped drives
+    project = (Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT).resolve()
     if not (project / "config.ini").is_file():
         sys.exit(f"ERROR: no config.ini in {project}")
     cfg.read(project / "config.ini", encoding="utf-8")
@@ -469,6 +595,11 @@ def main():
 
     events, options, branches = load(project / "data")
     errors, warnings, ev, opts = validate(events, options, branches)
+    images = {}
+    if not errors:  # image checks need valid events
+        pic_errors, pic_warnings, images = check_pictures(ev, project, mod_name)
+        errors += pic_errors
+        warnings += pic_warnings
 
     for w in warnings:
         print("WARNING:", w)
@@ -497,6 +628,7 @@ def main():
         write(on_actions_file, on_actions)
     elif on_actions_file.exists() and on_actions_file.read_text(encoding="utf-8").startswith(GENERATED):
         on_actions_file.unlink()  # stale from an earlier run; it would still fire old events
+    write_pictures(out, images, mod_name)
     print(f"\nOK: {len(ev)} events, {sum(len(v) for v in opts.values())} options written to {out}")
 
 
