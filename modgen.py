@@ -159,10 +159,6 @@ def validate(events, options, branches):
         if e["id"] in ev:
             errors.append(f"{loc}: duplicate event id '{e['id']}' (first used on line {ev[e['id']]['_line']})")
             continue
-        if not e["title"]:
-            errors.append(f"{loc}: event '{e['id']}' has no title")
-        if not e["desc"]:
-            warnings.append(f"{loc}: event '{e['id']}' has no description")
         etype = e.get("type") or "country_event"
         if etype not in EVENT_TYPES:
             errors.append(f"{loc}: type '{etype}' must be one of {', '.join(sorted(EVENT_TYPES))}")
@@ -177,6 +173,11 @@ def validate(events, options, branches):
                 flags[col] = None
         e["_fire_only_once"] = bool(flags["fire_only_once"])
         e["_hidden"] = bool(flags["hidden"])
+        # nobody sees a hidden event, so it needs no text
+        if not e["title"] and not e["_hidden"]:
+            errors.append(f"{loc}: event '{e['id']}' has no title")
+        if not e["desc"] and not e["_hidden"]:
+            warnings.append(f"{loc}: event '{e['id']}' has no description")
 
         # fired_by decides how the event starts; triggered_only must agree with it
         triggered = flags["triggered_only"]
@@ -247,7 +248,7 @@ def validate(events, options, branches):
         if any(other["key"] == key for other in opts[o["event_id"]]):
             errors.append(f"{loc}: event '{o['event_id']}' already has an option with key '{key}'")
             continue
-        if not o["name"]:
+        if not o["name"] and not ev[o["event_id"]]["_hidden"]:
             errors.append(f"{loc}: option '{key}' of '{o['event_id']}' has no name")
         if o.get("order") and not re.fullmatch(r"-?\d+", o["order"]):
             errors.append(f"{loc}: order '{o['order']}' must be a whole number")
@@ -344,8 +345,10 @@ def gen_events(ev, opts, branches):
     for eid, e in ev.items():
         lines.append(f"{e['_type']} = {{")
         lines.append(f"\tid = {eid}")
-        lines.append(f"\ttitle = {eid}.t")
-        lines.append(f"\tdesc = {eid}.d")
+        if e["title"]:
+            lines.append(f"\ttitle = {eid}.t")
+        if e["desc"]:
+            lines.append(f"\tdesc = {eid}.d")
         if e.get("picture"):
             lines.append(f"\tpicture = {e['picture']}")
         if e["_hidden"]:
@@ -369,7 +372,8 @@ def gen_events(ev, opts, branches):
 
         for o in opts[eid]:
             lines.append("\toption = {")
-            lines.append(f"\t\tname = {eid}.{o['key']}")
+            if o["name"]:
+                lines.append(f"\t\tname = {eid}.{o['key']}")
             if o.get("trigger"):
                 lines.append("\t\ttrigger = {")
                 lines += fmt_block(o["trigger"], 3)
@@ -434,10 +438,13 @@ def gen_on_actions(ev):
 def gen_loc(ev, opts):
     lines = ["l_english:"]
     for eid, e in ev.items():
-        lines.append(f' {eid}.t:0 "{loc_escape(e["title"])}"')
-        lines.append(f' {eid}.d:0 "{loc_escape(e["desc"])}"')
+        if e["title"]:
+            lines.append(f' {eid}.t:0 "{loc_escape(e["title"])}"')
+        if e["desc"]:
+            lines.append(f' {eid}.d:0 "{loc_escape(e["desc"])}"')
         for o in opts[eid]:
-            lines.append(f' {eid}.{o["key"]}:0 "{loc_escape(o["name"])}"')
+            if o["name"]:
+                lines.append(f' {eid}.{o["key"]}:0 "{loc_escape(o["name"])}"')
     return "\n".join(lines) + "\n"
 
 

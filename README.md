@@ -56,7 +56,7 @@ mod_path = C:/Users/you/Documents/Paradox Interactive/Hearts of Iron IV/mod/my_m
 | `fire_scope` | no | Who receives the event when `fired_by` is an on_action, e.g. `GER` or `every_country`. Required for `on_startup`. |
 | `triggered_only` | no | `yes` (default) / `no`. Usually leave blank and let `fired_by` decide. |
 | `fire_only_once` | no | `yes` / `no` |
-| `hidden` | no | `yes` / `no`. Hidden events may have no options (just `immediate`). |
+| `hidden` | no | `yes` / `no`. Hidden events need no title, description or option names, and may have no options (just `immediate`). |
 | `mtth_days` | no | Mean time to happen in days. Requires `fired_by = mtth`. |
 | `trigger` | no | Raw script: conditions, no outer `{ }` |
 | `immediate` | no | Raw script: effects that run when the event fires |
