@@ -12,8 +12,11 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 120
+line-length = 79  # PEP 8
 target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 72  # PEP 8: comments and docstrings
