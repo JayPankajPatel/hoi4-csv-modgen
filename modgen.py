@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.8"
+# dependencies = []
+# ///
 """Generate HOI4 event script + localisation from CSV tables.
 
 Reads  data/events.csv, data/options.csv, data/branches.csv

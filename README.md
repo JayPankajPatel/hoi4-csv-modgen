@@ -5,13 +5,22 @@ Write your events in spreadsheets, run one command, get Paradox script and local
 ## Workflow
 
 1. Edit the CSVs in `data/` (Excel / Google Sheets are fine; save as CSV).
-2. Double-click `run.bat` (or run `python modgen.py`).
+2. Double-click `run.bat` (or run `uv run modgen.py`).
 3. Copy the contents of `output/<mod_name>/` into your mod folder.
 4. Launch HOI4 and check `Documents/Paradox Interactive/Hearts of Iron IV/logs/error.log` for script errors.
 
 Never hand-edit the generated files. They are overwritten on every run.
 
-Requires Python 3.8+. No extra packages.
+## Setup
+
+Install [uv](https://docs.astral.sh/uv/) once. It downloads a suitable Python by itself, so you
+don't need to install Python separately.
+
+- Windows (PowerShell): `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+- macOS / Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+Then run `uv run modgen.py` (or double-click `run.bat`). The Python version and dependencies
+are declared at the top of `modgen.py`.
 
 Set the output folder name in `config.ini`.
 
