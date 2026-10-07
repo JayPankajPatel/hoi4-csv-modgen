@@ -1,5 +1,37 @@
+# Generator output (output/<mod>/ by default; examples write their own output/)
 output/
-__pycache__/
-*.pyc
-.venv/
+
+# Download cache used by examples/*/verify.py
 .cache/
+
+# Python bytecode and tool caches
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Virtual environments (uv sync creates .venv/)
+.venv/
+venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Spreadsheet lock files created while a CSV is open
+# Excel: ~$events.csv   LibreOffice: .~lock.events.csv#
+~$*
+.~lock.*#
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
