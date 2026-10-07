@@ -31,7 +31,7 @@ jobs:
           git fetch --depth=1 origin example/kaiser_redux
           git checkout FETCH_HEAD -- examples/kaiser_redux
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
 
       - name: Generate
         run: uv run modgen.py examples/kaiser_redux
