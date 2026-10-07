@@ -28,8 +28,11 @@ KEY_RE = re.compile(r"^(?!\d+$)[a-z0-9_]+$")
 RESERVED_KEYS = {"t", "d"}
 MOD_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
 ON_ACTION_RE = re.compile(r"^on_[a-z0-9_]+$")
+# on_actions that run with no country in scope, so the event needs fire_scope to have a receiver
+SCOPELESS_ON_ACTIONS = {"on_startup"}
 # which kind of scope each event type runs in; firing across kinds needs a `scope`
 SCOPE_CLASS = {"country_event": "country", "news_event": "country", "state_event": "state", "unit_leader_event": "unit leader"}
+SCOPE_HINT = {"country": "owner", "state": "capital_scope", "unit leader": "a unit leader scope"}
 SCOPE_RE = re.compile(r"^[A-Za-z0-9_.:@]+$")
 GENERATED = "# GENERATED FILE - do not edit. Change the CSVs and re-run the generator."
 
@@ -183,7 +186,12 @@ def validate(events, options, branches):
             if triggered is False:
                 errors.append(f"{loc}: fired_by = {fired_by} fires the event directly; set triggered_only to yes or leave it blank")
             triggered = True
-            if etype not in ("country_event", "news_event"):
+            if fired_by in SCOPELESS_ON_ACTIONS and not e.get("fire_scope"):
+                errors.append(
+                    f"{loc}: {fired_by} has no country in scope; set fire_scope to who gets the event "
+                    f"(e.g. GER, or every_country and limit it with trigger)"
+                )
+            elif etype not in ("country_event", "news_event") and not e.get("fire_scope"):
                 warnings.append(f"{loc}: {etype} '{e['id']}' is fired from {fired_by}; check that on_action runs in the right scope")
         elif fired_by not in ("", "external"):
             errors.append(f"{loc}: fired_by '{fired_by}' must be blank, external, mtth, or an on_action such as on_startup")
@@ -198,6 +206,11 @@ def validate(events, options, branches):
             warnings.append(f"{loc}: event '{e['id']}' is not triggered-only but has no mtth_days")
         e["_triggered_only"] = triggered
         e["_fired_by"] = fired_by
+        fire_scope = e.get("fire_scope", "")
+        if fire_scope and not SCOPE_RE.match(fire_scope):
+            errors.append(f"{loc}: fire_scope '{fire_scope}' must be a single scope, e.g. GER or every_country")
+        elif fire_scope and not ON_ACTION_RE.match(fired_by):
+            errors.append(f"{loc}: fire_scope only applies when fired_by is an on_action")
         check_script(loc, e, ("trigger", "immediate", "extra"))
         ev[e["id"]] = e
 
@@ -224,12 +237,15 @@ def validate(events, options, branches):
             errors.append(f"{loc}: option '{key}' of '{o['event_id']}' has no name")
         if o.get("order") and not re.fullmatch(r"-?\d+", o["order"]):
             errors.append(f"{loc}: order '{o['order']}' must be a whole number")
+            o["_bad_order"] = True  # already reported; keep the option so later checks don't cascade
         check_script(loc, o, ("effects", "trigger", "extra"))
         if o.get("ai_chance") and not re.fullmatch(r"-?\d+(\.\d+)?", o["ai_chance"]):
             check_script(loc, o, ("ai_chance",))
         opts[o["event_id"]].append(o)
 
     for eid, olist in opts.items():
+        if any(o.get("_bad_order") for o in olist):
+            continue
         with_order = [o for o in olist if o.get("order")]
         if with_order and len(with_order) != len(olist):
             errors.append(f"options.csv: event '{eid}' has an order on some options but not all; fill in every row or none")
@@ -272,7 +288,7 @@ def validate(events, options, branches):
         elif not scope and src_class and to_class and src_class != to_class:
             errors.append(
                 f"{loc}: '{to}' is a {ev[to]['_type']} but '{src}' is a {ev[src]['_type']}; "
-                f"set scope to say which {to_class} gets it (e.g. capital_scope)"
+                f"set scope to say which {to_class} gets it (e.g. {SCOPE_HINT[to_class]})"
             )
         check_script(loc, b, ("condition",))
         incoming.add(to)
@@ -375,7 +391,10 @@ def gen_on_actions(ev):
     by_action = defaultdict(list)
     for eid, e in ev.items():
         if ON_ACTION_RE.match(e["_fired_by"]):
-            by_action[e["_fired_by"]].append(f"{e['_type']} = {{ id = {eid} }}")
+            call = f"{e['_type']} = {{ id = {eid} }}"
+            if e.get("fire_scope"):
+                call = f"{e['fire_scope']} = {{ {call} }}"
+            by_action[e["_fired_by"]].append(call)
     if not by_action:
         return None
     lines = [GENERATED, "", "on_actions = {"]

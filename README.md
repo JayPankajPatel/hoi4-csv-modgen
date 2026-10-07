@@ -53,6 +53,7 @@ mod_path = C:/Users/you/Documents/Paradox Interactive/Hearts of Iron IV/mod/my_m
 | `desc` | yes | Event description text |
 | `picture` | no | GFX name, e.g. `GFX_report_event_generic_read_write` |
 | `fired_by` | no | How the event starts; see below. |
+| `fire_scope` | no | Who receives the event when `fired_by` is an on_action, e.g. `GER` or `every_country`. Required for `on_startup`. |
 | `triggered_only` | no | `yes` (default) / `no`. Usually leave blank and let `fired_by` decide. |
 | `fire_only_once` | no | `yes` / `no` |
 | `hidden` | no | `yes` / `no`. Hidden events may have no options (just `immediate`). |
@@ -74,8 +75,18 @@ first event of a chain does:
 | blank | Only reached through `branches.csv`. |
 
 A triggered-only event with a blank `fired_by` that nothing branches to gets a warning,
-because it can never happen. on_actions like `on_startup` run for every country, so use the
-event's `trigger` to limit who gets it (e.g. `tag = GER`).
+because it can never happen.
+
+`on_startup` runs once with no country in scope, so it needs `fire_scope`: a tag such as `GER`
+sends the event to that country, while `every_country` sends it to all of them, and the
+event's `trigger` decides who actually gets it. The sample generates:
+
+```
+on_startup = { effect = { GER = { country_event = { id = mymod.1 } } } }
+```
+
+Other on_actions have their own scopes; check the
+[wiki's On actions page](https://hoi4.paradoxwikis.com/On_actions) before using one.
 
 Yes/no columns accept `yes`/`no` (also `y`/`n`, `true`/`false`, `1`/`0`). Anything else is
 an error.

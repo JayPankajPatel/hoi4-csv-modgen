@@ -1,4 +1,4 @@
-id,type,title,desc,picture,fired_by,triggered_only,fire_only_once,hidden,mtth_days,trigger,immediate,extra
-mymod.1,country_event,The Crisis Begins,A diplomatic crisis has erupted on our border. How should we respond?,GFX_report_event_generic_read_write,on_startup,yes,yes,,,tag = GER,,
-mymod.2,country_event,We Mobilize,The army is put on alert. Our neighbours take notice.,GFX_report_event_generic_factory,,yes,yes,,,,add_stability = -0.05,
-mymod.3,country_event,Talks Succeed,Cooler heads prevail and the crisis passes.,GFX_report_event_generic_read_write,,yes,yes,,,,,
+id,type,title,desc,picture,fired_by,fire_scope,triggered_only,fire_only_once,hidden,mtth_days,trigger,immediate,extra
+mymod.1,country_event,The Crisis Begins,A diplomatic crisis has erupted on our border. How should we respond?,GFX_report_event_generic_read_write,on_startup,GER,yes,yes,,,tag = GER,,
+mymod.2,country_event,We Mobilize,The army is put on alert. Our neighbours take notice.,GFX_report_event_generic_factory,,,yes,yes,,,,add_stability = -0.05,
+mymod.3,country_event,Talks Succeed,Cooler heads prevail and the crisis passes.,GFX_report_event_generic_read_write,,,yes,yes,,,,,
