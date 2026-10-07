@@ -5,14 +5,18 @@
 # ///
 """Check that the generated example matches the Kaiserredux originals.
 
-Downloads the original event and localisation files at a pinned Kaiserredux commit, then
-compares them with output/kx_example/ by meaning, not by text:
+Downloads the original event and localisation files at a pinned
+Kaiserredux commit, then compares them with output/kx_example/ by
+meaning, not by text:
 
-- Event- and option-level fields are compared ignoring order (the game reads them by name).
-  Options keep their order, and effects inside options and every nested block keep theirs.
-- Comments and whitespace are ignored. `country_event = x.1` equals `country_event = { id = x.1 }`.
-- Localisation: every generated key must have the original's text. `\\"` and a bare `"` inside
-  text are treated as equal (Kaiserredux uses both).
+- Event- and option-level fields are compared ignoring order (the game
+  reads them by name). Options keep their order, and effects inside
+  options and every nested block keep theirs.
+- Comments and whitespace are ignored. `country_event = x.1` equals
+  `country_event = { id = x.1 }`.
+- Localisation: every generated key must have the original's text.
+  `\\"` and a bare `"` inside text are treated as equal (Kaiserredux
+  uses both).
 
 Run from the repository root, after generating:
     uv run modgen.py examples/kaiser_redux
@@ -47,18 +51,41 @@ LOC_FILES = [
     "KR_Kurdistan_l_english.yml",
     "KR_Leaders_l_english.yml",
 ]
-# Kaiserredux has no localisation for these; the example fills them with TODO
-KNOWN_MISSING_LOC = {f"flavornews.{n}.{k}" for n in (3, 4, 5) for k in ("t", "d", "a")}
+# Kaiserredux has no localisation for these; the example fills them with
+# TODO
+KNOWN_MISSING_LOC = {
+    f"flavornews.{n}.{k}" for n in (3, 4, 5) for k in ("t", "d", "a")
+}
 
 HERE = Path(__file__).parent
 CACHE = HERE / ".cache" / KX_COMMIT[:12]
 OUT = HERE / "output" / "kx_example"
 
-TOKEN_RE = re.compile(r'"(?:[^"\\]|\\.)*"|[{}]|<=|>=|!=|[=<>]|[^\s{}=<>#"]+|#[^\n]*')
+TOKEN_RE = re.compile(
+    r'"(?:[^"\\]|\\.)*"|[{}]|<=|>=|!=|[=<>]|[^\s{}=<>#"]+|#[^\n]*'
+)
 OPERATORS = ("=", "<", ">", "<=", ">=", "!=")
-EVENT_TYPES = {"country_event", "news_event", "state_event", "unit_leader_event", "operative_leader_event"}
-OPTION_UNORDERED = {"name", "trigger", "ai_chance", "original_recipient_only", "highlight_states"}
-BOOL_FLAGS = {"is_triggered_only", "fire_only_once", "hidden", "major", "fire_for_sender"}
+EVENT_TYPES = {
+    "country_event",
+    "news_event",
+    "state_event",
+    "unit_leader_event",
+    "operative_leader_event",
+}
+OPTION_UNORDERED = {
+    "name",
+    "trigger",
+    "ai_chance",
+    "original_recipient_only",
+    "highlight_states",
+}
+BOOL_FLAGS = {
+    "is_triggered_only",
+    "fire_only_once",
+    "hidden",
+    "major",
+    "fire_for_sender",
+}
 LOC_RE = re.compile(r'^\s*([\w.\-]+):\d*\s*"(.*)"\s*(#.*)?$')
 
 
@@ -72,7 +99,7 @@ def fetch(folder, name):
     return path.read_text(encoding="utf-8-sig")
 
 
-# ---------------------------------------------------------------- script
+# --------------------------------------------------------------- script
 def parse(tokens, i=0, top=True):
     items = []
     while i < len(tokens):
@@ -100,22 +127,39 @@ def parse(tokens, i=0, top=True):
 
 
 def canon(v):
-    return v if isinstance(v, str) else tuple(canon_item(k, o, x) for k, o, x in v)
+    return (
+        v
+        if isinstance(v, str)
+        else tuple(canon_item(k, o, x) for k, o, x in v)
+    )
 
 
 def canon_item(k, o, v):
-    if k in EVENT_TYPES and isinstance(v, str):  # shorthand for { id = ... }
+    # shorthand for { id = ... }
+    if k in EVENT_TYPES and isinstance(v, str):
         return (k, o, (("id", "=", v),))
     return (k, o, canon(v))
 
 
 def canon_event(items):
-    fields = sorted(canon_item(k, o, v) for k, o, v in items if k != "option" and not (k in BOOL_FLAGS and v == "no"))
+    fields = sorted(
+        canon_item(k, o, v)
+        for k, o, v in items
+        if k != "option" and not (k in BOOL_FLAGS and v == "no")
+    )
     options = []
     for k, _, v in items:
         if k == "option":
-            fixed = sorted(canon_item(kk, o, x) for kk, o, x in v if kk in OPTION_UNORDERED)
-            effects = tuple(canon_item(kk, o, x) for kk, o, x in v if kk not in OPTION_UNORDERED)
+            fixed = sorted(
+                canon_item(kk, o, x)
+                for kk, o, x in v
+                if kk in OPTION_UNORDERED
+            )
+            effects = tuple(
+                canon_item(kk, o, x)
+                for kk, o, x in v
+                if kk not in OPTION_UNORDERED
+            )
             options.append((tuple(fixed), effects))
     return tuple(fields), options
 
@@ -134,10 +178,12 @@ def events_of(text):
 def show(x):
     if isinstance(x, str):
         return x
-    return "{ " + " ".join(f"{k} {o} {show(v)}".strip() for k, o, v in x) + " }"
+    return (
+        "{ " + " ".join(f"{k} {o} {show(v)}".strip() for k, o, v in x) + " }"
+    )
 
 
-# ---------------------------------------------------------------- localisation
+# --------------------------------------------------------- localisation
 def loc_of(text):
     out = {}
     for line in text.splitlines():
@@ -149,7 +195,9 @@ def loc_of(text):
 
 def main():
     gen_events_file = OUT / "events" / "kx_example_events.txt"
-    gen_loc_file = OUT / "localisation" / "english" / "kx_example_events_l_english.yml"
+    gen_loc_file = (
+        OUT / "localisation" / "english" / "kx_example_events_l_english.yml"
+    )
     if not gen_events_file.exists():
         sys.exit("Generate first: uv run modgen.py examples/kaiser_redux")
 
@@ -161,7 +209,10 @@ def main():
     problems = 0
     for eid in sorted(set(original) | set(generated)):
         if eid not in generated or eid not in original:
-            print(f"{eid}: only in {'original' if eid in original else 'generated'}")
+            print(
+                f"{eid}: only in "
+                f"{'original' if eid in original else 'generated'}"
+            )
             problems += 1
             continue
         (ta, (fa, oa)), (tb, (fb, ob)) = original[eid], generated[eid]
@@ -196,10 +247,16 @@ def main():
             continue
         if orig_loc.get(k) != v:
             loc_problems += 1
-            print(f"{k}:\n   original:  {orig_loc.get(k, '<missing>')}\n   generated: {v}")
+            print(
+                f"{k}:\n   original:  {orig_loc.get(k, '<missing>')}\n   "
+                f"generated: {v}"
+            )
     checked = len(gen_loc) - len(KNOWN_MISSING_LOC & set(gen_loc))
     has_bom = gen_loc_file.read_bytes()[:3] == b"\xef\xbb\xbf"
-    print(f"localisation: {checked} keys compared, {loc_problems} difference(s), BOM {'ok' if has_bom else 'MISSING'}")
+    print(
+        f"localisation: {checked} keys compared, {loc_problems} "
+        f"difference(s), BOM {'ok' if has_bom else 'MISSING'}"
+    )
     return 1 if problems or loc_problems or not has_bom else 0
 
 
