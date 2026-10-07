@@ -1,0 +1,2 @@
+exit code: 1
+ERROR: config.ini mod_path 'nowhere' is not an existing folder

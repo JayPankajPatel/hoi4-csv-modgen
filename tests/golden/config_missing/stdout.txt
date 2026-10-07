@@ -1,0 +1,2 @@
+exit code: 1
+ERROR: no config.ini in <project>

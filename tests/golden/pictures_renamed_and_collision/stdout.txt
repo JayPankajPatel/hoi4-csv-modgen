@@ -1,0 +1,6 @@
+exit code: 1
+
+ERROR: events.csv line 2: picture 'pictures/fake.png' is not really a .png file (was it renamed?)
+ERROR: events.csv line 4: picture 'pictures/war.dds' and the one on line 3 would both be named pictures_war; rename one of the files
+
+2 error(s) found. Nothing was generated. Fix the CSVs and run again.

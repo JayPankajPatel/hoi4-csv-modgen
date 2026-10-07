@@ -1,0 +1,11 @@
+﻿l_english:
+ mymod.1.t:0 "The Crisis Begins"
+ mymod.1.d:0 "A diplomatic crisis has erupted on our border. How should we respond?"
+ mymod.1.mobilize:0 "Mobilize the army!"
+ mymod.1.diplomacy:0 "Seek a diplomatic solution"
+ mymod.2.t:0 "We Mobilize"
+ mymod.2.d:0 "The army is put on alert. Our neighbours take notice."
+ mymod.2.to_arms:0 "To arms!"
+ mymod.3.t:0 "Talks Succeed"
+ mymod.3.d:0 "Cooler heads prevail and the crisis passes."
+ mymod.3.excellent:0 "Excellent."

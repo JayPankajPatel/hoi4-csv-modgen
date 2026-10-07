@@ -195,6 +195,24 @@ uv run pre-commit run --all-files
 
 The hooks run `ruff check --fix`, `ruff format` and `ty check`.
 
+### Tests
+
+```
+uv run python -m unittest discover -s tests
+```
+
+`tests/test_modgen.py` runs the generator end to end on fixture projects. It compares the
+exit code, every message and every generated file with the recorded copies in `tests/golden/`,
+which cover every error and warning, the picture checks and the `config.ini` checks. It also
+checks stale-picture cleanup and the small helpers. CI runs the suite on Linux and Windows.
+
+After an intended change to messages or output, re-record the goldens and review the diff:
+
+```
+UPDATE_GOLDEN=1 uv run python -m unittest discover -s tests
+git diff tests/golden/
+```
+
 ### Code style
 
 [Django's coding style](https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/),

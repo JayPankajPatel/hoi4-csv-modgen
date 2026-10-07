@@ -1,0 +1,47 @@
+exit code: 1
+WARNING: events.csv line 5: event 'm.2' has no description
+WARNING: events.csv line 9: state_event 'm.6' is fired from on_daily; check that on_action runs in the right scope
+WARNING: events.csv line 12: hidden event 'm.9' has 2 options; nobody sees the choice
+WARNING: event 'm.3' is triggered-only but nothing fires it; set fired_by (e.g. on_startup, or external if a focus/decision fires it)
+WARNING: event 'm.11' is triggered-only but nothing fires it; set fired_by (e.g. on_startup, or external if a focus/decision fires it)
+
+ERROR: events.csv line 2: id 'bad id' must look like namespace.number (e.g. mymod.1)
+ERROR: events.csv line 3: fire_only_once 'maybe' must be yes, no, or blank
+ERROR: events.csv line 3: fired_by = on_startup fires the event directly; set triggered_only to yes or leave it blank
+ERROR: events.csv line 3: on_startup has no country in scope; set fire_scope to who gets the event (e.g. GER, or every_country and limit it with trigger)
+ERROR: events.csv line 3: immediate is missing 1 closing }
+ERROR: events.csv line 4: duplicate event id 'm.1' (first used on line 3)
+ERROR: events.csv line 5: type 'weird_event' must be one of country_event, news_event, state_event, unit_leader_event
+ERROR: events.csv line 5: event 'm.2' has no title
+ERROR: events.csv line 5: fired_by = mtth means the event fires on its own; set triggered_only to no or leave it blank
+ERROR: events.csv line 5: fired_by = mtth needs mtth_days
+ERROR: events.csv line 6: mtth_days does nothing on a triggered-only event; set fired_by = mtth
+ERROR: events.csv line 7: mtth_days 'abc' must be a whole number of days
+ERROR: events.csv line 8: fired_by 'bogus' must be blank, external, mtth, or an on_action such as on_startup
+ERROR: events.csv line 10: fire_scope 'bad scope' must be a single scope, e.g. GER or every_country
+ERROR: events.csv line 11: fire_scope only applies when fired_by is an on_action
+ERROR: options.csv line 2: event_id 'nope.1' does not exist in events.csv
+ERROR: options.csv line 4: key 'Bad Key' must be lowercase letters, digits and _, not only digits, and not 't' or 'd' (e.g. mobilize)
+ERROR: options.csv line 5: option 'ok' of 'm.1' has no name
+ERROR: options.csv line 6: event 'm.1' already has an option with key 'ok'
+ERROR: options.csv line 7: order 'x' must be a whole number
+ERROR: options.csv line 7: effects has a } with no matching {
+ERROR: options.csv line 10: ai_chance is missing 1 closing }
+ERROR: options.csv: event 'm.11' has an order on some options but not all; fill in every row or none
+ERROR: events.csv line 5: event 'm.2' has no options in options.csv
+ERROR: events.csv line 6: event 'm.3' has no options in options.csv
+ERROR: events.csv line 7: event 'm.4' has no options in options.csv
+ERROR: events.csv line 8: event 'm.5' has no options in options.csv
+ERROR: events.csv line 9: event 'm.6' has no options in options.csv
+ERROR: events.csv line 10: event 'm.7' has no options in options.csv
+ERROR: events.csv line 11: event 'm.8' has no options in options.csv
+ERROR: branches.csv line 2: from_event 'nope.1' does not exist
+ERROR: branches.csv line 3: to_event 'nope.2' does not exist (fired from 'm.1' option ok)
+ERROR: branches.csv line 4: from_option '1' is not an option key of 'm.1' (from_option takes the option's key, not its number); its keys are: ok, two
+ERROR: branches.csv line 5: days 'x' must be a whole number
+ERROR: branches.csv line 5: hidden 'maybe' must be yes, no, or blank
+ERROR: branches.csv line 5: 'm.10' is a state_event but 'm.1' is a country_event; set scope to say which state gets it (e.g. capital_scope)
+ERROR: branches.csv line 5: condition is missing 1 closing }
+ERROR: branches.csv line 6: scope 'bad scope' must be a single scope, e.g. capital_scope, GER, 64
+
+38 error(s) found. Nothing was generated. Fix the CSVs and run again.

@@ -1,0 +1,2 @@
+exit code: 1
+ERROR: config.ini name 'bad name' must be letters, digits and _ only (it is used in file names)
