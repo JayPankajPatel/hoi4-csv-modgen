@@ -1,6 +1,6 @@
-event_id,name,effects,ai_chance,trigger,extra
-mymod.1,Mobilize the army!,"add_political_power = -25
+event_id,key,name,effects,ai_chance,trigger,extra
+mymod.1,mobilize,Mobilize the army!,"add_political_power = -25
 add_war_support = 0.05",30,,
-mymod.1,Seek a diplomatic solution,"add_political_power = 25",70,,
-mymod.2,To arms!,"add_manpower = 5000",,,
-mymod.3,Excellent.,"add_stability = 0.05",,,
+mymod.1,diplomacy,Seek a diplomatic solution,"add_political_power = 25",70,,
+mymod.2,to_arms,To arms!,"add_manpower = 5000",,,
+mymod.3,excellent,Excellent.,"add_stability = 0.05",,,

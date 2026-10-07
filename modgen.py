@@ -21,6 +21,9 @@ DATA = ROOT / "data"
 
 EVENT_TYPES = {"country_event", "news_event", "state_event", "unit_leader_event"}
 ID_RE = re.compile(r"^[A-Za-z0-9_]+\.\d+$")
+# lowercase, not all digits (so a leftover option number is caught), not t/d (title/desc keys)
+KEY_RE = re.compile(r"^(?!\d+$)[a-z0-9_]+$")
+RESERVED_KEYS = {"t", "d"}
 
 
 # ---------------------------------------------------------------- helpers
@@ -73,7 +76,7 @@ def loc_escape(text):
 # ---------------------------------------------------------------- load
 def load():
     events = read_csv("events.csv", ["id", "title", "desc"])
-    options = read_csv("options.csv", ["event_id", "name"])
+    options = read_csv("options.csv", ["event_id", "key", "name"])
     branches = read_csv("branches.csv", ["from_event", "from_option", "to_event"])
     return events, options, branches
 
@@ -105,9 +108,29 @@ def validate(events, options, branches):
         if o["event_id"] not in ev:
             errors.append(f"{loc}: event_id '{o['event_id']}' does not exist in events.csv")
             continue
+        key = o["key"]
+        if not KEY_RE.match(key) or key in RESERVED_KEYS:
+            errors.append(
+                f"{loc}: key '{key}' must be lowercase letters, digits and _, not only digits, "
+                f"and not 't' or 'd' (e.g. mobilize)"
+            )
+            continue
+        if any(other["key"] == key for other in opts[o["event_id"]]):
+            errors.append(f"{loc}: event '{o['event_id']}' already has an option with key '{key}'")
+            continue
         if not o["name"]:
-            errors.append(f"{loc}: option for '{o['event_id']}' has no name")
+            errors.append(f"{loc}: option '{key}' of '{o['event_id']}' has no name")
+        if o.get("order") and not re.fullmatch(r"-?\d+", o["order"]):
+            errors.append(f"{loc}: order '{o['order']}' must be a whole number")
+            continue
         opts[o["event_id"]].append(o)
+
+    for eid, olist in opts.items():
+        with_order = [o for o in olist if o.get("order")]
+        if with_order and len(with_order) != len(olist):
+            errors.append(f"options.csv: event '{eid}' has an order on some options but not all; fill in every row or none")
+        elif with_order:
+            olist.sort(key=lambda o: int(o["order"]))  # stable: ties keep row order
 
     for eid, e in ev.items():
         if not opts[eid]:
@@ -123,14 +146,12 @@ def validate(events, options, branches):
         if to not in ev:
             errors.append(f"{loc}: to_event '{to}' does not exist (fired from '{src}' option {b['from_option']})")
             continue
-        try:
-            n = int(b["from_option"])
-            if not 1 <= n <= len(opts[src]):
-                raise ValueError
-        except ValueError:
+        keys = [o["key"] for o in opts[src]]
+        if b["from_option"] not in keys:
+            hint = " (from_option takes the option's key, not its number)" if b["from_option"].isdigit() else ""
             errors.append(
-                f"{loc}: from_option '{b['from_option']}' is not valid for '{src}' "
-                f"(it has {len(opts[src])} option(s); use 1-{len(opts[src])})"
+                f"{loc}: from_option '{b['from_option']}' is not an option key of '{src}'{hint}; "
+                f"its keys are: {', '.join(keys) or 'none'}"
             )
             continue
         for col in ("days", "hours", "random_days"):
@@ -150,9 +171,9 @@ def validate(events, options, branches):
 
 # ---------------------------------------------------------------- generate
 def gen_events(ev, opts, branches):
-    out_by = defaultdict(lambda: defaultdict(list))  # event -> option idx -> branches
+    out_by = defaultdict(lambda: defaultdict(list))  # event -> option key -> branches
     for b in branches:
-        out_by[b["from_event"]][int(b["from_option"])].append(b)
+        out_by[b["from_event"]][b["from_option"]].append(b)
 
     namespaces = []
     for eid in ev:
@@ -191,9 +212,9 @@ def gen_events(ev, opts, branches):
         if e.get("extra"):
             lines += fmt_block(e["extra"], 1)
 
-        for idx, o in enumerate(opts[eid], start=1):
+        for o in opts[eid]:
             lines.append("\toption = {")
-            lines.append(f"\t\tname = {eid}.{option_letter(idx)}")
+            lines.append(f"\t\tname = {eid}.{o['key']}")
             if o.get("trigger"):
                 lines.append("\t\ttrigger = {")
                 lines += fmt_block(o["trigger"], 3)
@@ -208,7 +229,7 @@ def gen_events(ev, opts, branches):
                     lines.append("\t\t}")
             if o.get("effects"):
                 lines += fmt_block(o["effects"], 2)
-            for b in out_by[eid].get(idx, []):
+            for b in out_by[eid].get(o["key"], []):
                 target_type = ev[b["to_event"]].get("type") or "country_event"
                 parts = [f"id = {b['to_event']}"]
                 for col in ("days", "hours", "random_days"):
@@ -231,18 +252,13 @@ def gen_events(ev, opts, branches):
     return "\n".join(lines)
 
 
-def option_letter(idx):
-    # 1->a, 2->b ... 26->z
-    return chr(ord("a") + idx - 1)
-
-
 def gen_loc(ev, opts):
     lines = ["l_english:"]
     for eid, e in ev.items():
         lines.append(f' {eid}.t:0 "{loc_escape(e["title"])}"')
         lines.append(f' {eid}.d:0 "{loc_escape(e["desc"])}"')
-        for idx, o in enumerate(opts[eid], start=1):
-            lines.append(f' {eid}.{option_letter(idx)}:0 "{loc_escape(o["name"])}"')
+        for o in opts[eid]:
+            lines.append(f' {eid}.{o["key"]}:0 "{loc_escape(o["name"])}"')
     return "\n".join(lines) + "\n"
 
 

@@ -43,25 +43,29 @@ Set the output folder name in `config.ini`.
 | `immediate` | no | Raw script: effects that run when the event fires |
 | `extra` | no | Raw script added to the event body (escape hatch) |
 
-### `data/options.csv` (one row per option; order = option order)
+### `data/options.csv` (one row per option)
 
 | Column | Required | Notes |
 |---|---|---|
 | `event_id` | yes | Must exist in `events.csv` |
+| `key` | yes | Short id for the option, unique within its event, e.g. `mobilize`. Lowercase letters, digits, `_`. Not `t` or `d`. |
+| `order` | no | Button order (whole number). Fill it for every option of an event or for none. |
 | `name` | yes | Button text |
 | `effects` | no | Raw script effects |
 | `ai_chance` | no | A number (becomes `base = N`) or raw script |
 | `trigger` | no | Raw script, makes the option conditional |
 | `extra` | no | Raw script added to the option (escape hatch) |
 
-Option 1 is the first row for that event, option 2 the second, and so on.
+Without `order`, buttons appear in row order. Options are identified by `key`, never by
+position, so sorting the sheet can change button order but never which branch or text
+belongs to which option.
 
 ### `data/branches.csv` (what an option fires next)
 
 | Column | Required | Notes |
 |---|---|---|
 | `from_event` | yes | Source event id |
-| `from_option` | yes | Option number (1, 2, 3...) |
+| `from_option` | yes | The option's `key`, e.g. `mobilize` |
 | `to_event` | yes | Event to fire |
 | `days` / `hours` / `random_days` | no | Delay, whole numbers |
 | `condition` | no | Raw script trigger; branch only fires if true |
@@ -88,12 +92,12 @@ The generator handles indentation.
 Generated automatically:
 
 - `mymod.1.t` title, `mymod.1.d` description
-- `mymod.1.a`, `.b`, `.c`... option names, in row order
+- `mymod.1.<key>` option names, e.g. `mymod.1.mobilize`
 
 ## Checks
 
 Before writing anything, the generator reports plain-English errors (duplicate ids,
-unknown event ids, bad option numbers, events with no options) and stops.
+unknown event ids, unknown option keys, events with no options) and stops.
 Warnings (such as an event nothing fires) don't stop the run.
 
 It can't check game logic. Typos in effect names show up in HOI4's `error.log`.
