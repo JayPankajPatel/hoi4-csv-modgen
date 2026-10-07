@@ -5,9 +5,11 @@
 # ///
 """Generate HOI4 event script + localisation from CSV tables.
 
-Reads  data/events.csv, data/options.csv, data/branches.csv
-Writes output/<mod_name>/events/generated_events.txt
-       output/<mod_name>/localisation/english/generated_events_l_english.yml
+Reads  data/events.csv, data/options.csv, data/branches.csv, config.ini
+Writes <out>/events/<mod>_events.txt
+       <out>/localisation/english/<mod>_events_l_english.yml
+       <out>/common/on_actions/<mod>_on_actions.txt   (only if fired_by uses an on_action)
+where <out> is mod_path from config.ini, or output/<mod>/ if it is not set.
 """
 import configparser
 import csv
@@ -24,6 +26,9 @@ ID_RE = re.compile(r"^[A-Za-z0-9_]+\.\d+$")
 # lowercase, not all digits (so a leftover option number is caught), not t/d (title/desc keys)
 KEY_RE = re.compile(r"^(?!\d+$)[a-z0-9_]+$")
 RESERVED_KEYS = {"t", "d"}
+MOD_NAME_RE = re.compile(r"^[A-Za-z0-9_]+$")
+ON_ACTION_RE = re.compile(r"^on_[a-z0-9_]+$")
+GENERATED = "# GENERATED FILE - do not edit. Change the CSVs and re-run the generator."
 
 
 # ---------------------------------------------------------------- helpers
@@ -47,10 +52,20 @@ def read_csv(name, required):
     return rows
 
 
-def yes(value, default=False):
-    if value == "":
-        return default
-    return value.lower() in ("yes", "y", "true", "1")
+TRUE_WORDS = {"yes", "y", "true", "1"}
+FALSE_WORDS = {"no", "n", "false", "0"}
+
+
+def parse_bool(value):
+    """'' -> None, yes-ish -> True, no-ish -> False, anything else -> ValueError."""
+    v = value.lower()
+    if v == "":
+        return None
+    if v in TRUE_WORDS:
+        return True
+    if v in FALSE_WORDS:
+        return False
+    raise ValueError(value)
 
 
 def fmt_block(text, indent):
@@ -100,6 +115,47 @@ def validate(events, options, branches):
         etype = e.get("type") or "country_event"
         if etype not in EVENT_TYPES:
             errors.append(f"{loc}: type '{etype}' must be one of {', '.join(sorted(EVENT_TYPES))}")
+        e["_type"] = etype
+
+        flags = {}
+        for col in ("triggered_only", "fire_only_once", "hidden"):
+            try:
+                flags[col] = parse_bool(e.get(col, ""))
+            except ValueError:
+                errors.append(f"{loc}: {col} '{e[col]}' must be yes, no, or blank")
+                flags[col] = None
+        e["_fire_only_once"] = bool(flags["fire_only_once"])
+        e["_hidden"] = bool(flags["hidden"])
+
+        # fired_by decides how the event starts; triggered_only must agree with it
+        triggered = flags["triggered_only"]
+        fired_by = e.get("fired_by", "")
+        mtth = e.get("mtth_days", "")
+        if fired_by == "mtth":
+            if triggered:
+                errors.append(f"{loc}: fired_by = mtth means the event fires on its own; set triggered_only to no or leave it blank")
+            triggered = False
+            if not mtth:
+                errors.append(f"{loc}: fired_by = mtth needs mtth_days")
+        elif ON_ACTION_RE.match(fired_by):
+            if triggered is False:
+                errors.append(f"{loc}: fired_by = {fired_by} fires the event directly; set triggered_only to yes or leave it blank")
+            triggered = True
+            if etype not in ("country_event", "news_event"):
+                warnings.append(f"{loc}: {etype} '{e['id']}' is fired from {fired_by}; check that on_action runs in the right scope")
+        elif fired_by not in ("", "external"):
+            errors.append(f"{loc}: fired_by '{fired_by}' must be blank, external, mtth, or an on_action such as on_startup")
+        if triggered is None:
+            triggered = True
+        if mtth:
+            if not re.fullmatch(r"[1-9]\d*", mtth):
+                errors.append(f"{loc}: mtth_days '{mtth}' must be a whole number of days")
+            elif triggered:
+                errors.append(f"{loc}: mtth_days does nothing on a triggered-only event; set fired_by = mtth")
+        elif not triggered and fired_by != "mtth":
+            warnings.append(f"{loc}: event '{e['id']}' is not triggered-only but has no mtth_days")
+        e["_triggered_only"] = triggered
+        e["_fired_by"] = fired_by
         ev[e["id"]] = e
 
     opts = defaultdict(list)
@@ -160,11 +216,10 @@ def validate(events, options, branches):
         incoming.add(to)
 
     for eid, e in ev.items():
-        triggered_only = yes(e.get("triggered_only", ""), True)
-        if triggered_only and eid not in incoming and not e.get("fired_by_note"):
+        if e["_triggered_only"] and not e["_fired_by"] and eid not in incoming:
             warnings.append(
-                f"event '{eid}' is triggered-only but nothing in branches.csv fires it "
-                f"(fine if a focus/decision fires it; otherwise it can never happen)"
+                f"event '{eid}' is triggered-only but nothing fires it; set fired_by "
+                f"(e.g. on_startup, or external if a focus/decision fires it)"
             )
     return errors, warnings, ev, opts
 
@@ -181,23 +236,22 @@ def gen_events(ev, opts, branches):
         if ns not in namespaces:
             namespaces.append(ns)
 
-    lines = ["# GENERATED FILE - do not edit. Change the CSVs and re-run the generator.", ""]
+    lines = [GENERATED, ""]
     lines += [f"add_namespace = {ns}" for ns in namespaces]
     lines.append("")
 
     for eid, e in ev.items():
-        etype = e.get("type") or "country_event"
-        lines.append(f"{etype} = {{")
+        lines.append(f"{e['_type']} = {{")
         lines.append(f"\tid = {eid}")
         lines.append(f"\ttitle = {eid}.t")
         lines.append(f"\tdesc = {eid}.d")
         if e.get("picture"):
             lines.append(f"\tpicture = {e['picture']}")
-        if yes(e.get("hidden", "")):
+        if e["_hidden"]:
             lines.append("\thidden = yes")
-        if yes(e.get("triggered_only", ""), True):
+        if e["_triggered_only"]:
             lines.append("\tis_triggered_only = yes")
-        if yes(e.get("fire_only_once", "")):
+        if e["_fire_only_once"]:
             lines.append("\tfire_only_once = yes")
         if e.get("mtth_days"):
             lines.append(f"\tmean_time_to_happen = {{ days = {e['mtth_days']} }}")
@@ -230,7 +284,7 @@ def gen_events(ev, opts, branches):
             if o.get("effects"):
                 lines += fmt_block(o["effects"], 2)
             for b in out_by[eid].get(o["key"], []):
-                target_type = ev[b["to_event"]].get("type") or "country_event"
+                target_type = ev[b["to_event"]]["_type"]
                 parts = [f"id = {b['to_event']}"]
                 for col in ("days", "hours", "random_days"):
                     if b.get(col):
@@ -252,6 +306,22 @@ def gen_events(ev, opts, branches):
     return "\n".join(lines)
 
 
+def gen_on_actions(ev):
+    by_action = defaultdict(list)
+    for eid, e in ev.items():
+        if ON_ACTION_RE.match(e["_fired_by"]):
+            by_action[e["_fired_by"]].append(f"{e['_type']} = {{ id = {eid} }}")
+    if not by_action:
+        return None
+    lines = [GENERATED, "", "on_actions = {"]
+    for action, calls in by_action.items():
+        lines += [f"\t{action} = {{", "\t\teffect = {"]
+        lines += [f"\t\t\t{c}" for c in calls]
+        lines += ["\t\t}", "\t}"]
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
 def gen_loc(ev, opts):
     lines = ["l_english:"]
     for eid, e in ev.items():
@@ -263,10 +333,18 @@ def gen_loc(ev, opts):
 
 
 # ---------------------------------------------------------------- main
+def write(path, text, bom=False):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8-sig" if bom else "utf-8")
+
+
 def main():
     cfg = configparser.ConfigParser()
     cfg.read(ROOT / "config.ini", encoding="utf-8")
-    mod_name = cfg.get("mod", "name", fallback="my_mod")
+    mod_name = cfg.get("mod", "name", fallback="my_mod").strip()
+    if not MOD_NAME_RE.match(mod_name):
+        sys.exit(f"ERROR: config.ini name '{mod_name}' must be letters, digits and _ only (it is used in file names)")
+    mod_path = cfg.get("mod", "mod_path", fallback="").strip()
 
     events, options, branches = load()
     errors, warnings, ev, opts = validate(events, options, branches)
@@ -279,17 +357,25 @@ def main():
             print("ERROR:", err)
         sys.exit(f"\n{len(errors)} error(s) found. Nothing was generated. Fix the CSVs and run again.")
 
-    out = ROOT / "output" / mod_name
-    (out / "events").mkdir(parents=True, exist_ok=True)
-    (out / "localisation" / "english").mkdir(parents=True, exist_ok=True)
+    if mod_path:
+        out = Path(mod_path).expanduser()
+        if not out.is_absolute():
+            out = ROOT / out
+        if not out.is_dir():
+            sys.exit(f"ERROR: config.ini mod_path '{mod_path}' is not an existing folder")
+    else:
+        out = ROOT / "output" / mod_name
 
-    (out / "events" / "generated_events.txt").write_text(
-        gen_events(ev, opts, branches), encoding="utf-8"
-    )
-    # HOI4 localisation must be UTF-8 WITH BOM
-    (out / "localisation" / "english" / "generated_events_l_english.yml").write_text(
-        gen_loc(ev, opts), encoding="utf-8-sig"
-    )
+    # Only ever touch files named after this mod, so other files in the mod folder are safe.
+    write(out / "events" / f"{mod_name}_events.txt", gen_events(ev, opts, branches))
+    # HOI4 localisation must be UTF-8 WITH BOM, and the name must end in _l_english.yml
+    write(out / "localisation" / "english" / f"{mod_name}_events_l_english.yml", gen_loc(ev, opts), bom=True)
+    on_actions_file = out / "common" / "on_actions" / f"{mod_name}_on_actions.txt"
+    on_actions = gen_on_actions(ev)
+    if on_actions:
+        write(on_actions_file, on_actions)
+    elif on_actions_file.exists() and on_actions_file.read_text(encoding="utf-8").startswith(GENERATED):
+        on_actions_file.unlink()  # stale from an earlier run; it would still fire old events
     print(f"\nOK: {len(ev)} events, {sum(len(v) for v in opts.values())} options written to {out}")
 
 
