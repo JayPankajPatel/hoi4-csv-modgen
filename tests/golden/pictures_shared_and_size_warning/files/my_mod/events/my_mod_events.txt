@@ -1,0 +1,57 @@
+# GENERATED FILE - do not edit. Change the CSVs and re-run the generator.
+
+add_namespace = mymod
+
+country_event = {
+	id = mymod.1
+	title = mymod.1.t
+	desc = mymod.1.d
+	picture = GFX_my_mod_pictures_war
+	is_triggered_only = yes
+	fire_only_once = yes
+	trigger = {
+		tag = GER
+	}
+	option = {
+		name = mymod.1.mobilize
+		ai_chance = { base = 30 }
+		add_political_power = -25
+		add_war_support = 0.05
+		country_event = { id = mymod.2 days = 2 }
+	}
+	option = {
+		name = mymod.1.diplomacy
+		ai_chance = { base = 70 }
+		add_political_power = 25
+		country_event = { id = mymod.3 days = 5 random_days = 2 }
+	}
+}
+
+country_event = {
+	id = mymod.2
+	title = mymod.2.t
+	desc = mymod.2.d
+	picture = GFX_my_mod_pictures_small
+	is_triggered_only = yes
+	fire_only_once = yes
+	immediate = {
+		add_stability = -0.05
+	}
+	option = {
+		name = mymod.2.to_arms
+		add_manpower = 5000
+	}
+}
+
+country_event = {
+	id = mymod.3
+	title = mymod.3.t
+	desc = mymod.3.d
+	picture = GFX_my_mod_pictures_war
+	is_triggered_only = yes
+	fire_only_once = yes
+	option = {
+		name = mymod.3.excellent
+		add_stability = 0.05
+	}
+}

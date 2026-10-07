@@ -1,0 +1,8 @@
+# GENERATED FILE - do not edit. Change the CSVs and re-run the generator.
+
+spriteTypes = {
+	spriteType = {
+		name = "GFX_my_mod_pictures_crisis"
+		texturefile = "gfx/event_pictures/my_mod_pictures_crisis.png"
+	}
+}

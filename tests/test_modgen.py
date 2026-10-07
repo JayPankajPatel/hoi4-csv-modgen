@@ -2,8 +2,10 @@
 
 Golden tests run the generator end to end on a fixture project and compare
 its exit code, every message it prints and every file it writes with the
-recorded copy in tests/golden/<case>/. After an intended change, re-record
-with:
+recorded copy in tests/golden/<case>/. The expected files live in files/,
+not output/, because .gitignore ignores every output/ folder.
+
+After an intended change, re-record with:
 
     UPDATE_GOLDEN=1 uv run python -m unittest discover -s tests
 
@@ -142,7 +144,7 @@ class GoldenTestCase(unittest.TestCase):
             golden.mkdir(parents=True)
             (golden / "stdout.txt").write_text(stdout, encoding="utf-8", newline="\n")
             for rel, data in files.items():
-                dest = golden / "output" / rel
+                dest = golden / "files" / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(data)
             return
@@ -150,7 +152,7 @@ class GoldenTestCase(unittest.TestCase):
             self.fail(f"no golden output for {case}; run with UPDATE_GOLDEN=1")
         expected = (golden / "stdout.txt").read_bytes().replace(b"\r\n", b"\n")
         self.assertEqual(stdout, expected.decode("utf-8"))
-        self.assertEqual(files, read_tree(golden / "output"))
+        self.assertEqual(files, read_tree(golden / "files"))
 
 
 # ------------------------------------------------------------ golden tests
