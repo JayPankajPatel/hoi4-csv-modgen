@@ -12,11 +12,20 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 79  # PEP 8
+# Django's style (docs/internals/contributing/writing-code/coding-style.txt):
+# black's 88-character lines for code, 79 for comments and docstrings.
+line-length = 88
 target-version = "py39"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP"]
+# Django runs flake8 (pycodestyle E/W + pyflakes F) and isort with the black
+# profile (I). Added on top: B (likely bugs), UP (modern syntax) and ANN
+# (every function fully type-annotated, which Django itself doesn't require).
+select = ["E", "W", "F", "I", "B", "UP", "ANN"]
 
 [tool.ruff.lint.pycodestyle]
-max-doc-length = 72  # PEP 8: comments and docstrings
+max-doc-length = 79
+
+[tool.ty.rules]
+# every ty diagnostic is an error, so the pre-commit hook fails on any of them
+all = "error"

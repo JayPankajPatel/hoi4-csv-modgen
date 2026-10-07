@@ -195,6 +195,19 @@ uv run pre-commit run --all-files
 
 The hooks run `ruff check --fix`, `ruff format` and `ty check`.
 
+### Code style
+
+[Django's coding style](https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/),
+using ruff in place of the black, isort and flake8 that Django runs, plus strict typing:
+
+- **Line length:** 88 characters for code, 79 for comments and docstrings.
+- **Format:** `ruff format` (black-compatible). Imports are sorted the isort/black way.
+- **Lint:** pycodestyle and pyflakes (Django's flake8 set), plus bugbear (`B`) and pyupgrade (`UP`).
+- **f-strings:** only plain variables inside the braces. Assign anything more complex to a local first.
+- **Docstrings:** PEP 257.
+- **Typing:** every function is fully annotated (ruff `ANN`), and every ty diagnostic is an error.
+  This goes beyond Django, which doesn't use type hints.
+
 ## Example
 
 [`examples/kaiser_redux/`](examples/kaiser_redux/) rebuilds 18 Kaiserredux events from CSV and checks the

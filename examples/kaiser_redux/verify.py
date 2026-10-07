@@ -23,11 +23,24 @@ Run from the repository root, after generating:
     uv run examples/kaiser_redux/verify.py
 """
 
+from __future__ import annotations
+
 import re
 import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from typing import Union
+
+# Parsed script: a block is a list of (key, operator, value) items, where
+# a value is a token or a nested block. Canonical form swaps lists for
+# tuples so blocks can be sorted and compared.
+Value = Union[str, list["Item"]]
+Item = tuple[str, str, Value]
+Canon = Union[str, tuple["CanonItem", ...]]
+CanonItem = tuple[str, str, Canon]
+Option = tuple[tuple[CanonItem, ...], tuple[CanonItem, ...]]
+Event = tuple[str, tuple[tuple[CanonItem, ...], list[Option]]]
 
 KX_COMMIT = "30dffc2614130cf3b57dd77d618e1795df742e5c"
 RAW = f"https://raw.githubusercontent.com/JoeBidenWhatAreYouHiding/kx/{KX_COMMIT}/"
@@ -52,18 +65,14 @@ LOC_FILES = [
     "KR_Leaders_l_english.yml",
 ]
 # Kaiserredux has no localisation for these; the example fills them with
-# TODO
-KNOWN_MISSING_LOC = {
-    f"flavornews.{n}.{k}" for n in (3, 4, 5) for k in ("t", "d", "a")
-}
+# TODO.
+KNOWN_MISSING_LOC = {f"flavornews.{n}.{k}" for n in (3, 4, 5) for k in ("t", "d", "a")}
 
 HERE = Path(__file__).parent
 CACHE = HERE / ".cache" / KX_COMMIT[:12]
 OUT = HERE / "output" / "kx_example"
 
-TOKEN_RE = re.compile(
-    r'"(?:[^"\\]|\\.)*"|[{}]|<=|>=|!=|[=<>]|[^\s{}=<>#"]+|#[^\n]*'
-)
+TOKEN_RE = re.compile(r'"(?:[^"\\]|\\.)*"|[{}]|<=|>=|!=|[=<>]|[^\s{}=<>#"]+|#[^\n]*')
 OPERATORS = ("=", "<", ">", "<=", ">=", "!=")
 EVENT_TYPES = {
     "country_event",
@@ -89,7 +98,8 @@ BOOL_FLAGS = {
 LOC_RE = re.compile(r'^\s*([\w.\-]+):\d*\s*"(.*)"\s*(#.*)?$')
 
 
-def fetch(folder, name):
+def fetch(folder: str, name: str) -> str:
+    """Return a Kaiserredux file at the pinned commit, downloading once."""
     path = CACHE / folder / name
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,9 +109,10 @@ def fetch(folder, name):
     return path.read_text(encoding="utf-8-sig")
 
 
-# --------------------------------------------------------------- script
-def parse(tokens, i=0, top=True):
-    items = []
+# ------------------------------------------------------------------ script
+def parse(tokens: list[str], i: int = 0, top: bool = True) -> tuple[list[Item], int]:
+    """Parse tokens into a block; return it and the index after it."""
+    items: list[Item] = []
     while i < len(tokens):
         t = tokens[i]
         if t == "}":
@@ -109,6 +120,7 @@ def parse(tokens, i=0, top=True):
                 raise SyntaxError("unbalanced }")
             return items, i + 1
         if i + 1 < len(tokens) and tokens[i + 1] in OPERATORS:
+            val: Value
             if tokens[i + 2] == "{":
                 val, j = parse(tokens, i + 3, top=False)
             else:
@@ -116,8 +128,8 @@ def parse(tokens, i=0, top=True):
             items.append((t, tokens[i + 1], val))
             i = j
         elif t == "{":
-            val, i = parse(tokens, i + 1, top=False)
-            items.append(("", "", val))
+            block, i = parse(tokens, i + 1, top=False)
+            items.append(("", "", block))
         else:
             items.append(("", "", t))
             i += 1
@@ -126,66 +138,68 @@ def parse(tokens, i=0, top=True):
     return items, i
 
 
-def canon(v):
-    return (
-        v
-        if isinstance(v, str)
-        else tuple(canon_item(k, o, x) for k, o, x in v)
-    )
+def canon(v: Value) -> Canon:
+    """Convert a parsed value to its comparable form."""
+    if isinstance(v, str):
+        return v
+    return tuple(canon_item(k, o, x) for k, o, x in v)
 
 
-def canon_item(k, o, v):
-    # shorthand for { id = ... }
+def canon_item(k: str, o: str, v: Value) -> CanonItem:
+    """Canonicalise one item; `country_event = x` means `{ id = x }`."""
     if k in EVENT_TYPES and isinstance(v, str):
         return (k, o, (("id", "=", v),))
     return (k, o, canon(v))
 
 
-def canon_event(items):
+def canon_event(items: list[Item]) -> tuple[tuple[CanonItem, ...], list[Option]]:
+    """Split an event into sorted fields and its options, in order."""
     fields = sorted(
         canon_item(k, o, v)
         for k, o, v in items
         if k != "option" and not (k in BOOL_FLAGS and v == "no")
     )
-    options = []
+    options: list[Option] = []
     for k, _, v in items:
-        if k == "option":
+        if k == "option" and not isinstance(v, str):
             fixed = sorted(
-                canon_item(kk, o, x)
-                for kk, o, x in v
-                if kk in OPTION_UNORDERED
+                canon_item(kk, o, x) for kk, o, x in v if kk in OPTION_UNORDERED
             )
             effects = tuple(
-                canon_item(kk, o, x)
-                for kk, o, x in v
-                if kk not in OPTION_UNORDERED
+                canon_item(kk, o, x) for kk, o, x in v if kk not in OPTION_UNORDERED
             )
             options.append((tuple(fixed), effects))
     return tuple(fields), options
 
 
-def events_of(text):
+def events_of(text: str) -> dict[str, Event]:
+    """Parse an event file into {event id: (type, canonical event)}."""
     tokens = [t for t in TOKEN_RE.findall(text) if not t.startswith("#")]
     items, _ = parse(tokens)
-    out = {}
+    out: dict[str, Event] = {}
     for k, _, v in items:
-        if k in EVENT_TYPES:
-            eid = next(x for kk, _, x in v if kk == "id")
+        if k in EVENT_TYPES and not isinstance(v, str):
+            eid = next(x for kk, _, x in v if kk == "id" and isinstance(x, str))
             out[eid] = (k, canon_event(v))
     return out
 
 
-def show(x):
+def show(x: Canon) -> str:
+    """Render a canonical value back as one line of script."""
     if isinstance(x, str):
         return x
-    return (
-        "{ " + " ".join(f"{k} {o} {show(v)}".strip() for k, o, v in x) + " }"
-    )
+    parts = []
+    for k, o, v in x:
+        rendered = show(v)
+        parts.append(f"{k} {o} {rendered}".strip())
+    joined = " ".join(parts)
+    return f"{{ {joined} }}"
 
 
-# --------------------------------------------------------- localisation
-def loc_of(text):
-    out = {}
+# ------------------------------------------------------------ localisation
+def loc_of(text: str) -> dict[str, str]:
+    """Parse a localisation file into {key: text}, unescaping quotes."""
+    out: dict[str, str] = {}
     for line in text.splitlines():
         m = LOC_RE.match(line)
         if m:
@@ -193,15 +207,14 @@ def loc_of(text):
     return out
 
 
-def main():
+def main() -> int:
+    """Compare the generated example with the originals; 1 on differences."""
     gen_events_file = OUT / "events" / "kx_example_events.txt"
-    gen_loc_file = (
-        OUT / "localisation" / "english" / "kx_example_events_l_english.yml"
-    )
+    gen_loc_file = OUT / "localisation" / "english" / "kx_example_events_l_english.yml"
     if not gen_events_file.exists():
         sys.exit("Generate first: uv run modgen.py examples/kaiser_redux")
 
-    original = {}
+    original: dict[str, Event] = {}
     for name in EVENT_FILES:
         original.update(events_of(fetch("events", name)))
     generated = events_of(gen_events_file.read_text(encoding="utf-8-sig"))
@@ -209,10 +222,8 @@ def main():
     problems = 0
     for eid in sorted(set(original) | set(generated)):
         if eid not in generated or eid not in original:
-            print(
-                f"{eid}: only in "
-                f"{'original' if eid in original else 'generated'}"
-            )
+            where = "original" if eid in original else "generated"
+            print(f"{eid}: only in {where}")
             problems += 1
             continue
         (ta, (fa, oa)), (tb, (fb, ob)) = original[eid], generated[eid]
@@ -223,21 +234,27 @@ def main():
             problems += 1
             print(f"{eid}: event fields differ")
             for x in sorted(set(fa) - set(fb)):
-                print(f"   original:  {show((x,))}")
+                rendered = show((x,))
+                print(f"   original:  {rendered}")
             for x in sorted(set(fb) - set(fa)):
-                print(f"   generated: {show((x,))}")
+                rendered = show((x,))
+                print(f"   generated: {rendered}")
         if len(oa) != len(ob):
-            print(f"{eid}: {len(oa)} options vs {len(ob)}")
+            count_a, count_b = len(oa), len(ob)
+            print(f"{eid}: {count_a} options vs {count_b}")
             problems += 1
         for n, (x, y) in enumerate(zip(oa, ob), 1):
             if x != y:
                 problems += 1
+                rendered_a = show((("", "", x[0] + x[1]),))
+                rendered_b = show((("", "", y[0] + y[1]),))
                 print(f"{eid}: option {n} differs")
-                print(f"   original:  {show((('', '', x[0] + x[1]),))}")
-                print(f"   generated: {show((('', '', y[0] + y[1]),))}")
-    print(f"script: {len(original)} events compared, {problems} difference(s)")
+                print(f"   original:  {rendered_a}")
+                print(f"   generated: {rendered_b}")
+    event_count = len(original)
+    print(f"script: {event_count} events compared, {problems} difference(s)")
 
-    orig_loc = {}
+    orig_loc: dict[str, str] = {}
     for name in LOC_FILES:
         orig_loc.update(loc_of(fetch("localisation", name)))
     gen_loc = loc_of(gen_loc_file.read_text(encoding="utf-8-sig"))
@@ -247,15 +264,14 @@ def main():
             continue
         if orig_loc.get(k) != v:
             loc_problems += 1
-            print(
-                f"{k}:\n   original:  {orig_loc.get(k, '<missing>')}\n   "
-                f"generated: {v}"
-            )
+            expected = orig_loc.get(k, "<missing>")
+            print(f"{k}:\n   original:  {expected}\n   generated: {v}")
     checked = len(gen_loc) - len(KNOWN_MISSING_LOC & set(gen_loc))
     has_bom = gen_loc_file.read_bytes()[:3] == b"\xef\xbb\xbf"
+    bom = "ok" if has_bom else "MISSING"
     print(
-        f"localisation: {checked} keys compared, {loc_problems} "
-        f"difference(s), BOM {'ok' if has_bom else 'MISSING'}"
+        f"localisation: {checked} keys compared, {loc_problems} difference(s), "
+        f"BOM {bom}"
     )
     return 1 if problems or loc_problems or not has_bom else 0
 
