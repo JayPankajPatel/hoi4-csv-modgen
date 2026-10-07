@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.8"
+# requires-python = ">=3.9"
 # dependencies = []
 # ///
 """Generate HOI4 event script + localisation from CSV tables.
@@ -11,6 +11,7 @@ Writes <out>/events/<mod>_events.txt
        <out>/common/on_actions/<mod>_on_actions.txt   (only if fired_by uses an on_action)
 where <out> is mod_path from config.ini, or output/<mod>/ if it is not set.
 """
+
 import configparser
 import csv
 import re
@@ -31,7 +32,12 @@ ON_ACTION_RE = re.compile(r"^on_[a-z0-9_]+$")
 # on_actions that run with no country in scope, so the event needs fire_scope to have a receiver
 SCOPELESS_ON_ACTIONS = {"on_startup"}
 # which kind of scope each event type runs in; firing across kinds needs a `scope`
-SCOPE_CLASS = {"country_event": "country", "news_event": "country", "state_event": "state", "unit_leader_event": "unit leader"}
+SCOPE_CLASS = {
+    "country_event": "country",
+    "news_event": "country",
+    "state_event": "state",
+    "unit_leader_event": "unit leader",
+}
 SCOPE_HINT = {"country": "owner", "state": "capital_scope", "unit leader": "a unit leader scope"}
 SCOPE_RE = re.compile(r"^[A-Za-z0-9_.:@]+$")
 GENERATED = "# GENERATED FILE - do not edit. Change the CSVs and re-run the generator."
@@ -178,13 +184,19 @@ def validate(events, options, branches):
         mtth = e.get("mtth_days", "")
         if fired_by == "mtth":
             if triggered:
-                errors.append(f"{loc}: fired_by = mtth means the event fires on its own; set triggered_only to no or leave it blank")
+                errors.append(
+                    f"{loc}: fired_by = mtth means the event fires on its own; "
+                    f"set triggered_only to no or leave it blank"
+                )
             triggered = False
             if not mtth:
                 errors.append(f"{loc}: fired_by = mtth needs mtth_days")
         elif ON_ACTION_RE.match(fired_by):
             if triggered is False:
-                errors.append(f"{loc}: fired_by = {fired_by} fires the event directly; set triggered_only to yes or leave it blank")
+                errors.append(
+                    f"{loc}: fired_by = {fired_by} fires the event directly; "
+                    f"set triggered_only to yes or leave it blank"
+                )
             triggered = True
             if fired_by in SCOPELESS_ON_ACTIONS and not e.get("fire_scope"):
                 errors.append(
@@ -192,9 +204,13 @@ def validate(events, options, branches):
                     f"(e.g. GER, or every_country and limit it with trigger)"
                 )
             elif etype not in ("country_event", "news_event") and not e.get("fire_scope"):
-                warnings.append(f"{loc}: {etype} '{e['id']}' is fired from {fired_by}; check that on_action runs in the right scope")
+                warnings.append(
+                    f"{loc}: {etype} '{e['id']}' is fired from {fired_by}; check that on_action runs in the right scope"
+                )
         elif fired_by not in ("", "external"):
-            errors.append(f"{loc}: fired_by '{fired_by}' must be blank, external, mtth, or an on_action such as on_startup")
+            errors.append(
+                f"{loc}: fired_by '{fired_by}' must be blank, external, mtth, or an on_action such as on_startup"
+            )
         if triggered is None:
             triggered = True
         if mtth:
@@ -248,7 +264,9 @@ def validate(events, options, branches):
             continue
         with_order = [o for o in olist if o.get("order")]
         if with_order and len(with_order) != len(olist):
-            errors.append(f"options.csv: event '{eid}' has an order on some options but not all; fill in every row or none")
+            errors.append(
+                f"options.csv: event '{eid}' has an order on some options but not all; fill in every row or none"
+            )
         elif with_order:
             olist.sort(key=lambda o: int(o["order"]))  # stable: ties keep row order
 
@@ -256,7 +274,10 @@ def validate(events, options, branches):
         if not opts[eid] and not e["_hidden"]:
             errors.append(f"events.csv line {e['_line']}: event '{eid}' has no options in options.csv")
         if e["_hidden"] and len(opts[eid]) > 1:
-            warnings.append(f"events.csv line {e['_line']}: hidden event '{eid}' has {len(opts[eid])} options; nobody sees the choice")
+            warnings.append(
+                f"events.csv line {e['_line']}: hidden event '{eid}' has {len(opts[eid])} options; "
+                f"nobody sees the choice"
+            )
 
     incoming = set()
     for b in branches:

@@ -1,0 +1,19 @@
+[project]
+name = "hoi4-csv-modgen"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.3.0",
+    "ruff>=0.16.10",
+    "ty>=0.0.85",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

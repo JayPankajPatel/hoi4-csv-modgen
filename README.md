@@ -159,3 +159,16 @@ It can't check game logic. Typos in effect names show up in HOI4's `error.log`.
 
 CSV: UTF-8 (Excel's "CSV UTF-8" is fine). Output localisation is written as UTF-8 with BOM,
 which HOI4 requires.
+
+## Development
+
+Developer tools (ruff, ty, pre-commit) are declared in `pyproject.toml` and pinned in `uv.lock`.
+Users running the generator don't need them; `uv run modgen.py` uses only the script header.
+
+```
+uv sync                       # install dev tools into .venv
+uv run pre-commit install     # run checks on every commit
+uv run pre-commit run --all-files
+```
+
+The hooks run `ruff check --fix`, `ruff format` and `ty check`.
